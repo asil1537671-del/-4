@@ -167,8 +167,7 @@ def main_app():
 
 st.title(f"📁 سجل ديون العميل: {cust}")
 
-
-        records = st.session_state.customers[cust]
+records = st.session_state.customers[cust]
 
         # نماذج إضافة دين أو تسديد
         col_add1, col_add2 = st.columns(2)
