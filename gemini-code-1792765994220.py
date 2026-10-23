@@ -1,205 +1,229 @@
-import json
-import os
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ملف حفظ البيانات محلياً لضمان عدم ضياعها
-DATA_FILE = "debt_data.json"
-
-
-def load_data():
-  if os.path.exists(DATA_FILE):
-    try:
-      with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-    except:
-      return {}
-  return {}
-
-
-def save_data(data):
-  with open(DATA_FILE, "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=4)
-
-
-# تهيئة البيانات
-if "db" not in st.session_state:
-  st.session_state.db = load_data()
-
+# إعدادات الصفحة
 st.set_page_config(
-    page_title="تطبيق تسجيل الديون", page_icon="💰", layout="centered"
+    page_title="دفتر ديوني",
+    page_icon="💰",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-st.markdown(
-    """
+# تخصيص الألوان والتصميم ليشابه الواجهة الأصلية
+st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
+    .main {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+    .metric-card {
+        background-color: #1f2937;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
     </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-st.title("💰 تطبيق تسجيل الديون")
+# تهيئة بيانات الحالة الافتراضية
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 
-# القائمة الجانبية (جهة اليمين) للبحث وسجل العملاء
-st.sidebar.header("🔍 البحث والعملاء")
-search_query = st.sidebar.text_input("بحث عن عميل...")
+if 'customers' not in st.session_state:
+    # هيكل بيانات العملاء والديون
+    st.session_state.customers = {
+        "أحمد محمد": [
+            {"type": "دين", "amount": 500, "date": "2026-06-01", "note": "شراء بضاعة"},
+            {"type": "تسديد", "amount": 200, "date": "2026-06-05", "note": "دفعة أولى"}
+        ],
+        "خالد علي": [
+            {"type": "دين", "amount": 1200, "date": "2026-05-20", "note": "قرض شخصي"}
+        ]
+    }
 
-# إضافة عميل جديد (الاسم ورقم الهاتف مباشرة)
-with st.expander("➕ إضافة عميل جديد", expanded=False):
-  with st.form("add_client_form"):
-    client_name = st.text_input("اسم العميل")
-    client_phone = st.text_input("رقم الهاتف")
-    submitted_client = st.form_submit_button("إضافة العميل")
-    if submitted_client:
-      if client_name:
-        if client_name not in st.session_state.db:
-          st.session_state.db[client_name] = {
-              "phone": client_phone,
-              "transactions": [],
-          }
-          save_data(st.session_state.db)
-          st.success(f"تمت إضافة العميل {client_name} بنجاح!")
-          st.rerun()
+if 'selected_customer' not in st.session_state:
+    st.session_state.selected_customer = None
+
+# شاشة تسجيل الدخول
+def login_screen():
+    st.markdown("<h1 style='text-align: center;'>تسجيل الدخول - دفتر ديوني</h1>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        username = st.text_input("اسم المستخدم")
+        password = st.text_input("كلمة المرور", type="password")
+        if st.button("دخول"):
+            if username and password:  # يمكنك تخصيص شرط التحقق هنا
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("الرجاء إدخال بيانات الصحيحة")
+
+# الآلة الحاسبة العائمة (تظهر في الواجهة كجزء عائم تفاعلي)
+def floating_calculator():
+    calc_html = """
+    <div id="floating-calc" style="position: fixed; bottom: 20px; left: 20px; background: #1f2937; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 9999; width: 220px; direction: ltr;">
+        <div style="font-size: 14px; color: #fff; margin-bottom: 5px; text-align: right;">آلة حاسبة</div>
+        <input type="text" id="calc-display" style="width: 100%; height: 35px; font-size: 18px; text-align: right; margin-bottom: 10px; background: #111; color: #0ff; border: 1px solid #444; border-radius: 5px;" disabled>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;">
+            <button onclick="clearCalc()" style="background: #ef4444; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">C</button>
+            <button onclick="appendCalc('/')" style="background: #374151; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">/</button>
+            <button onclick="appendCalc('*')" style="background: #374151; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">*</button>
+            <button onclick="appendCalc('-')" style="background: #374151; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">-</button>
+            <button onclick="appendCalc('7')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">7</button>
+            <button onclick="appendCalc('8')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">8</button>
+            <button onclick="appendCalc('9')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">9</button>
+            <button onclick="appendCalc('+')" style="background: #374151; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">+</button>
+            <button onclick="appendCalc('4')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">4</button>
+            <button onclick="appendCalc('5')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">5</button>
+            <button onclick="appendCalc('6')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">6</button>
+            <button onclick="calculateResult()" style="background: #10b981; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer; grid-row: span 2;">=</button>
+            <button onclick="appendCalc('1')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">1</button>
+            <button onclick="appendCalc('2')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">2</button>
+            <button onclick="appendCalc('3')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">3</button>
+            <button onclick="appendCalc('0')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer; grid-column: span 2;">0</button>
+            <button onclick="appendCalc('.')" style="background: #4b5563; color: #fff; border:none; padding: 8px; border-radius:4px; cursor:pointer;">.</button>
+        </div>
+    </div>
+    <script>
+        function appendCalc(val) {
+            document.getElementById('calc-display').value += val;
+        }
+        function clearCalc() {
+            document.getElementById('calc-display').value = '';
+        }
+        function calculateResult() {
+            try {
+                document.getElementById('calc-display').value = eval(document.getElementById('calc-display').value);
+            } catch(e) {
+                document.getElementById('calc-display').value = 'خطأ';
+            }
+        }
+    </script>
+    """
+    components.html(calc_html, height=270)
+
+# تطبيق الرئيسي بعد تسجيل الدخول
+def main_app():
+    # شريط التنقل الجانبي
+    st.sidebar.title("إدارة دفتر ديوني")
+    if st.sidebar.button("تسجيل الخروج"):
+        st.session_state.logged_in = False
+        st.session_state.selected_customer = None
+        st.rerun()
+
+    st.sidebar.markdown("---")
+    
+    # عرض الآلة الحاسبة العائمة في الجانب أو الشاشة
+    floating_calculator()
+
+    # إذا لم يتم اختيار عميل، نعرض قائمة إجمالي العملاء
+    if st.session_state.selected_customer is None:
+        st.title("📊 لوحة التحكم - إجمالي العملاء")
+        
+        # إضافة عميل جديد
+        with st.expander("➕ إضافة عميل جديد"):
+            new_cust_name = st.text_input("اسم العميل الجديد")
+            if st.button("حفظ العميل"):
+                if new_cust_name and new_cust_name not in st.session_state.customers:
+                    st.session_state.customers[new_cust_name] = []
+                    st.success(f"تم إضافة العميل {new_cust_name} بنجاح")
+                    st.rerun()
+                else:
+                    st.warning("الاسم موجود مسبقاً أو فارغ")
+
+        st.markdown("### قائمة العملاء")
+        
+        # بطاقات أو جدول إجمالي العملاء
+        if not st.session_state.customers:
+            st.info("لا يوجد عملاء مضافين حالياً.")
         else:
-          st.warning("اسم العميل موجود مسبقاً!")
-      else:
-        st.error("يرجى إدخال اسم العميل على الأقل.")
+            for cust, records in st.session_state.customers.items():
+                total_debt = sum(r['amount'] for r in records if r['type'] == 'دين')
+                total_paid = sum(r['amount'] for r in records if r['type'] == 'تسديد')
+                remaining = total_debt - total_paid
 
-# تصفية العملاء بناءً على البحث
-clients = list(st.session_state.db.keys())
-if search_query:
-  clients = [c for c in clients if search_query in c]
+                col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
+                col1.markdown(f"**👤 {cust}**")
+                col2.markdown(f"إجمالي الدين: `{total_debt}`")
+                col3.markdown(f"المتبقي: **`{remaining}`**")
+                
+                if col4.button(f"عرض السجل", key=f"btn_{cust}2"):
+                    st.session_state.selected_customer = cust
+                    st.rerun()
+                st.markdown("---")
 
-if not clients:
-  st.info("لا توجد عملاء مسجلين حالياً أو مطابقة للبحث.")
-else:
-  selected_client = st.selectbox("اختر العميل لعرض حسابه:", clients)
-
-  if selected_client:
-    client_data = st.session_state.db[selected_client]
-    st.subheader(f"حساب العميل: {selected_client}")
-    if client_data.get("phone"):
-      st.write(f"📱 رقم الهاتف: {client_data['phone']}")
-
-    # حساب الإجماليات
-    total_debt = sum(
-        t["amount"]
-        for t in client_data["transactions"]
-        if t["type"] == "دين"
-    )
-    total_paid = sum(
-        t["amount"]
-        for t in client_data["transactions"]
-        if t["type"] == "تسديد"
-    )
-    remaining = total_debt - total_paid
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("إجمالي الديون", f"{total_debt:,.2f}")
-    col2.metric("إجمالي المدفوعات", f"{total_paid:,.2f}")
-    col3.metric("المتبقي", f"{remaining:,.2f}")
-
-    # --- الحاسبة العائمة والمتنقلة في صفحة العميل ---
-    with st.expander("🧮 الحاسبة السريعة", expanded=False):
-      calculator_html = """
-            <div style="background: #ffffff; padding: 15px; border-radius: 12px; max-width: 280px; margin: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border: 1px solid #ddd;">
-                <input type="text" id="calc-display" style="width: 100%; height: 45px; font-size: 22px; text-align: right; margin-bottom: 10px; padding: 5px; border-radius: 6px; border: 1px solid #ccc; background: #f9f9f9;" readonly>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                    <button onclick="clearDisp()" style="padding: 12px; font-size: 16px; background: #ff6b6b; color: white; border: none; border-radius: 6px; font-weight: bold;">C</button>
-                    <button onclick="appendVal('/')" style="padding: 12px; font-size: 16px; background: #e0e0e0; border: none; border-radius: 6px; font-weight: bold;">/</button>
-                    <button onclick="appendVal('*')" style="padding: 12px; font-size: 16px; background: #e0e0e0; border: none; border-radius: 6px; font-weight: bold;">*</button>
-                    <button onclick="appendVal('-')" style="padding: 12px; font-size: 16px; background: #e0e0e0; border: none; border-radius: 6px; font-weight: bold;">-</button>
-                    <button onclick="appendVal('7')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">7</button>
-                    <button onclick="appendVal('8')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">8</button>
-                    <button onclick="appendVal('9')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">9</button>
-                    <button onclick="appendVal('+')" style="padding: 12px; font-size: 16px; background: #e0e0e0; border: none; border-radius: 6px; font-weight: bold;" rowspan="2">+</button>
-                    <button onclick="appendVal('4')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">4</button>
-                    <button onclick="appendVal('5')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">5</button>
-                    <button onclick="appendVal('6')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">6</button>
-                    <button onclick="appendVal('1')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">1</button>
-                    <button onclick="appendVal('2')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">2</button>
-                    <button onclick="appendVal('3')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">3</button>
-                    <button onclick="calculate()" style="padding: 12px; font-size: 16px; background: #4caf50; color: white; border: none; border-radius: 6px; font-weight: bold; grid-column: span 2;">=</button>
-                    <button onclick="appendVal('0')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px; grid-column: span 2;">0</button>
-                    <button onclick="appendVal('.')" style="padding: 12px; font-size: 16px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">.</button>
-                </div>
-            </div>
-            <script>
-                function appendVal(val) { document.getElementById('calc-display').value += val; }
-                function clearDisp() { document.getElementById('calc-display').value = ''; }
-                function calculate() {
-                    try { document.getElementById('calc-display').value = eval(document.getElementById('calc-display').value); }
-                    catch(e) { document.getElementById('calc-display').value = 'خطأ'; }
-                }
-            </script>
-            """
-      components.html(calculator_html, height=320)
-
-    # قسم تسجيل دين جديد (بدون الدين العام، مبلغ يقبل الكسور العشرية)
-    with st.expander("➕ تسجيل دين جديد", expanded=False):
-      with st.form(f"add_debt_{selected_client}"):
-        debt_amount = st.number_input(
-            "مبلغ الدين", min_value=0.0, step=0.01, format="%.2f"
-        )
-        debt_currency = st.selectbox(
-            "العملة", ["ريال يمني", "دولار أمريكي"]
-        )
-        debt_notes = st.text_area("ملاحظات (اختياري)")
-        submit_debt = st.form_submit_button("حفظ الدين")
-        if submit_debt and debt_amount > 0:
-          client_data["transactions"].append({
-              "type": "دين",
-              "amount": debt_amount,
-              "currency": debt_currency,
-              "notes": debt_notes,
-          })
-          save_data(st.session_state.db)
-          st.success("تم تسجيل الدين بنجاح!")
-          st.rerun()
-
-    # قسم تسجيل تسديد (تمت إزالة خيار "اختر الدين" ومطابقة الحقول)
-    with st.expander("💵 تسجيل تسديد دفعة", expanded=False):
-      with st.form(f"add_payment_{selected_client}"):
-        pay_amount = st.number_input(
-            "مبلغ التسديد", min_value=0.0, step=0.01, format="%.2f"
-        )
-        pay_currency = st.selectbox(
-            "عملة التسديد", ["ريال يمني", "دولار أمريكي"]
-        )
-        pay_notes = st.text_area("ملاحظات التسديد (اختياري)")
-        submit_pay = st.form_submit_button("حفظ التسديد")
-        if submit_pay and pay_amount > 0:
-          client_data["transactions"].append({
-              "type": "تسديد",
-              "amount": pay_amount,
-              "currency": pay_currency,
-              "notes": pay_notes,
-          })
-          save_data(st.session_state.db)
-          st.success("تم تسجيل التسديد بنجاح!")
-          st.rerun()
-
-    # سجل العمليات مع الملاحظات وخيار الحذف
-    st.markdown("---")
-    st.subheader("📋 سجل العمليات")
-    if not client_data["transactions"]:
-      st.info("لا توجد عمليات مسجلة لهذا العميل حتى الآن.")
     else:
-      for idx, tx in enumerate(client_data["transactions"]):
-        cols = st.columns([2, 3, 2, 1])
-        tx_type_color = (
-            "🔴 دين" if tx["type"] == "دين" else "🟢 تسديد"
-        )
-        cols[0].write(f"**{tx_type_color}**")
-        cols[1].write(
-            f"المبلغ: {tx['amount']:,.2f} {tx.get('currency', '')}"
-        )
-        cols[2].write(f"ملاحظات: {tx.get('notes', 'لا توجد')}")
+        # عرض سجلات الديون الكاملة للعميل المحدد
+        cust = st.session_state.selected_customer
+        if st.button("⬅️ العودة إلى قائمة العملاء"):
+            st.session_state.selected_customer = None
+            st.rerun()
 
-        if cols[3].button("🗑️", key=f"del_{selected_client}_{idx}"):
-          client_data["transactions"].pop(idx)
-          save_data(st.session_state.db)
-          st.success("تم حذف السجل بنجاح!")
-          st.rerun()
+        st.title(, فلان: f"📁 سجل ديون العميل: {cust}")
+
+        records = st.session_state.customers[cust]
+
+        # نماذج إضافة دين أو تسديد
+        col_add1, col_add2 = st.columns(2)
+        with col_add1:
+            with st.form(key="add_debt_form"):
+                st.subheader("➕ أضف دين جديد")
+                d_amount = st.number_input("المبلغ", min_value=0.0, step=10.0, key="d_amt")
+                d_date = st.date_input("التاريخ", key="d_date")
+                d_note = st.text_input("ملاحظة / البيان", key="d_note")
+                submit_debt = st.form_submit_button("حفظ الدين")
+                if submit_debt:
+                    records.append({"type": "دين", "amount": d_amount, "date": str(d_date), "note": d_note})
+                    st.success("تم إضافة الدين بنجاح")
+                    st.rerun()
+
+        with col_add2:
+            with st.form(key="add_pay_form"):
+                st.subheader("💵 تسجيل تسديد")
+                p_amount = st.number_input("مبلغ التسديد", min_value=0.0, step=10.0, key="p_amt")
+                p_date = st.date_input("تاريخ التسديد", key="p_date")
+                p_note = st.text_input("ملاحظة التسديد", key="p_note")
+                submit_pay = st.form_submit_button("حفظ التسديد")
+                if submit_pay:
+                    records.append({"type": "تسديد", "amount": p_amount, "date": str(p_date), "note": p_note})
+                    st.success("تم تسجيل التسديد بنجاح")
+                    st.rerun()
+
+        st.markdown("---")
+        st.subheader("📋 السجلات الكاملة (تعديل وحذف)")
+
+        if not records:
+            st.info("لا توجد سجلات مسجلة لهذا العميل بعد.")
+        else:
+            for idx, rec in enumerate(records):
+                col_r1, col_r2, col_r3, col_r4, col_r5 = st.columns([1, 2, 2, 2, 2])
+                col_r1.write(f"#{idx+1}")
+                col_r2.write(f"**{rec['type']}**")
+                col_r3.write(f"المبلغ: {rec['amount']}")
+                col_r4.write(f"التاريخ: {rec['date']}")
+                
+                # زر الحذف والتعديل لكل سطر
+                with col_r5:
+                    if st.button("🗑️ حذف", key=f"del_{cust}_{idx}"):
+                        records.pop(idx)
+                        st.success("تم الحذف بنجاح")
+                        st.rerun()
+
+        # زر حذف العميل بالكامل
+        if st.button("🗑️ حذف العميل وسجلاته بالكامل", type="primary"):
+            del st.session_state.customers[cust]
+            st.session_state.selected_customer = None
+            st.success("تم حذف العميل بنجاح")
+            st.rerun()
+
+# التحكم في عرض الشاشة بناءً على حالة تسجيل الدخول
+if not st.session_state.logged_in:
+    login_screen()
+else:
+    main_app()
