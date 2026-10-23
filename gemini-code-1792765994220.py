@@ -165,7 +165,7 @@ def main_app():
             st.session_state.selected_customer = None
             st.rerun()
 
-        st.title(, فلان: f"📁 سجل ديون العميل: {cust}")
+st.title(f"📁 سجل ديون العميل: {cust}").
 
         records = st.session_state.customers[cust]
 
