@@ -170,7 +170,7 @@ st.title(f"📁 سجل ديون العميل: {cust}")
 records = st.session_state.customers[cust]
 
         # نماذج إضافة دين أو تسديد
-        col_add1, col_add2 = st.columns(2)
+    col_add1, col_add2 = st.columns(2)
         with col_add1:
             with st.form(key="add_debt_form"):
                 st.subheader("➕ أضف دين جديد")
