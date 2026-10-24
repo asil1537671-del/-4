@@ -87,13 +87,6 @@ div.stButton > button:hover, div.stFormSubmitButton > button:hover {
 .metric-label { color: #64748b; font-size: .74rem; font-weight: 600; line-height: 1.2; }
 .metric-value { color: #14213d; font-size: 1.05rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
 .metric-sub { color: #94a3b8; font-size: .66rem; margin-top: 2px; line-height: 1.2; }
-.panel {
-    background: white;
-    border: 1px solid #e5eaf3;
-    border-radius: 18px;
-    padding: 18px;
-    box-shadow: 0 6px 20px rgba(25, 45, 85, .04);
-}
 div[data-testid="stExpander"] {
     background: rgba(255,255,255,.82);
     border: 1px solid #e5eaf3;
@@ -166,9 +159,6 @@ def clear_search():
     st.session_state["customer_search"] = ""
 
 # ---------- Floating Calculator ----------
-# ملاحظة: st.markdown لا ينفّذ وسوم <script>، ولهذا كانت الحاسبة لا تستجيب.
-# الحل: نحقن الحاسبة (HTML + CSS + JS) مرة واحدة داخل صفحة Streamlit نفسها،
-# فتبقى تعمل بين كل إعادة تشغيل وبين الصفحات، وزر واحد يفتح ويغلق.
 CALC_HTML = r"""
 <script>
 (function () {
@@ -248,7 +238,6 @@ CALC_HTML = r"""
     clr.textContent = "مسح C";
     grid.appendChild(clr);
 
-    // ضغطة واحدة: فتح / إغلاق
     btn.addEventListener("click", function () {
       box.classList.toggle("open");
     });
@@ -298,7 +287,6 @@ with top_left:
     st.markdown("# 📒 دفتر ديوني")
     st.caption("إدارة الديون والتسديدات بطريقة مرتبة وواضحة")
 with top_right:
-    # أيقونة البحث في الزاوية العلوية اليمنى، والشريط يفتح عند الضغط عليها فقط
     if selected_id is None:
         st.markdown("<div style='padding-top:14px'></div>", unsafe_allow_html=True)
         with st.popover("🔎", use_container_width=True, help="بحث عن عميل"):
@@ -308,7 +296,6 @@ with top_right:
                 key="customer_search",
             )
 
-# تشغيل الحاسبة العائمة في كل الصفحات
 floating_calculator()
 
 # ---------- Customer details ----------
@@ -326,7 +313,6 @@ if selected_id is not None:
     records = get_records(selected_id)
     summary = currency_summary(records)
 
-    # كل الإحصائيات في صف واحد
     stat_cols = st.columns(6)
     with stat_cols[0]:
         metric_card("عدد العمليات", str(len(records)), "#2563eb")
@@ -456,7 +442,6 @@ else:
     for c in customers:
         all_records.extend(get_records(c["id"]))
 
-    # نموذج إضافة عميل جديد في أعلى الصفحة
     with st.expander("➕ إضافة عميل جديد", expanded=not bool(customers)):
         with st.form("new_customer_form", clear_on_submit=True):
             new_name = st.text_input("اسم العميل", placeholder="اكتب اسم العميل هنا")
@@ -471,12 +456,10 @@ else:
                     except sqlite3.IntegrityError:
                         st.error("هذا الاسم موجود مسبقًا.")
 
-    # كل الإحصائيات في صف واحد مصغّر
     total_debt_count = sum(1 for r in all_records if r["type"] == "دين")
     total_payment_count = sum(1 for r in all_records if r["type"] == "تسديد")
     overall = currency_summary(all_records)
 
-    # مجموعتان منظمتان في صف واحد: نظرة عامة | الإجماليات حسب العملة
     group_overview, group_totals = st.columns(2, gap="large")
     with group_overview:
         st.caption("📊 نظرة عامة")
