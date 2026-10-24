@@ -290,11 +290,11 @@ if selected_id is not None:
     with add_col:
         with st.form("add_debt_form", clear_on_submit=True):
             st.subheader("➕ إضافة دين")
-            d_amount = st.number_input("المبلغ", min_value=0.0, step=10.0, format="%.2f", key="debt_amount")
+            d_amount = st.number_input("المبلغ", min_value=0.0, value=None, step=1.0, format="%.2f", placeholder="اكتب المبلغ مثل 250 أو 250.75", key="debt_amount")
             d_currency = st.selectbox("العملة", CURRENCIES, key="debt_currency")
             d_note = st.text_input("البيان / الملاحظة", key="debt_note")
             if st.form_submit_button("حفظ الدين", use_container_width=True):
-                if d_amount <= 0:
+                if d_amount is None or d_amount <= 0:
                     st.error("أدخل مبلغًا أكبر من صفر.")
                 else:
                     add_record(selected_id, "دين", d_amount, d_currency, d_note)
@@ -303,11 +303,11 @@ if selected_id is not None:
     with pay_col:
         with st.form("add_payment_form", clear_on_submit=True):
             st.subheader("💵 تسجيل تسديد")
-            p_amount = st.number_input("مبلغ التسديد", min_value=0.0, step=10.0, format="%.2f", key="pay_amount")
+            p_amount = st.number_input("مبلغ التسديد", min_value=0.0, value=None, step=1.0, format="%.2f", placeholder="اكتب المبلغ مثل 250 أو 250.75", key="pay_amount")
             p_currency = st.selectbox("عملة التسديد", CURRENCIES, key="pay_currency")
             p_note = st.text_input("بيان التسديد", key="pay_note")
             if st.form_submit_button("حفظ التسديد", use_container_width=True):
-                if p_amount <= 0:
+                if p_amount is None or p_amount <= 0:
                     st.error("أدخل مبلغًا أكبر من صفر.")
                 else:
                     add_record(selected_id, "تسديد", p_amount, p_currency, p_note)
