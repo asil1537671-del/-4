@@ -61,41 +61,18 @@ html, body, [class*="css"], [data-testid="stAppViewContainer"] {
 [data-testid="stHeader"] { background: rgba(0,0,0,0); }
 .block-container { padding-top: 1rem; padding-bottom: 5rem; max-width: 1400px; }
 
-/* بطاقات الإحصائيات المصغرة جنبًا إلى جنب */
-.stat-card-row {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-}
 .metric-card {
-    flex: 1;
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 10px 14px;
+    padding: 12px 16px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
-.metric-label { color: #64748b; font-size: 0.8rem; font-weight: 600; }
-.metric-value { font-size: 1.15rem; font-weight: 800; margin-top: 2px; }
-
-/* أزرار العمليات */
-.btn-debt {
-    background-color: #ef4444 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 10px !important;
-    font-weight: 700 !important;
-}
-.btn-pay {
-    background-color: #10b981 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 10px !important;
-    font-weight: 700 !important;
-}
+.metric-label { color: #64748b; font-size: 0.85rem; font-weight: 600; }
+.metric-value { font-size: 1.25rem; font-weight: 800; margin-top: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -138,13 +115,12 @@ def add_customer(name):
             (name.strip(), datetime.now().strftime("%Y-%m-%d %H:%M"))
         )
 
-def add_record(customer_id, kind, amount, currency, note):
+def add_record(customer_id, kind, amount, currency, note, created_at):
     with get_conn() as conn:
         conn.execute(
             """INSERT INTO records(customer_id, type, amount, currency, note, created_at)
                VALUES(?, ?, ?, ?, ?, ?)""",
-            (customer_id, kind, float(amount), currency, note.strip(),
-             datetime.now().strftime("%Y-%m-%d %H:%M"))
+            (customer_id, kind, float(amount), currency, note.strip(), created_at)
         )
 
 # ---------- الحاسبة السوداء الاحترافية ----------
@@ -257,17 +233,16 @@ if "selected_customer_id" not in st.session_state:
 
 selected_id = st.session_state.selected_customer_id
 
-# Header
 st.title("📒 دفتر ديوني")
 
-# ---------- الصفحة الرئيسية / قائمة العملاء ----------
+# ---------- الصفحة الرئيسية ----------
 if selected_id is None:
     customers = get_customers()
     all_records = []
     for c in customers:
         all_records.extend(get_records(c["id"]))
 
-    # الإحصائيات جنبًا إلى جنب
+    # الإحصائيات جنبًا إلى جنب تماماً
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f'<div class="metric-card"><div class="metric-label">إجمالي العملاء</div><div class="metric-value" style="color:#2563eb">{len(customers)}</div></div>', unsafe_allow_html=True)
@@ -280,7 +255,6 @@ if selected_id is None:
 
     st.markdown("---")
 
-    # إضافة عميل جديد
     with st.expander("➕ إضافة عميل جديد"):
         with st.form("add_cust_form", clear_on_submit=True):
             c_name = st.text_input("اسم العميل")
@@ -293,7 +267,6 @@ if selected_id is None:
                     except:
                         st.error("الاسم موجود مسبقاً")
 
-    # قائمة العملاء
     st.subheader("👥 سجل العملاء")
     for customer in customers:
         records = get_records(customer["id"])
@@ -309,7 +282,7 @@ if selected_id is None:
                     st.session_state.selected_customer_id = customer["id"]
                     st.rerun()
 
-# ---------- واجهة العميل المفرد ----------
+# ---------- واجهة تفاصيل العميل ----------
 else:
     customer = get_customer(selected_id)
     if st.button("⬅️ العودة للعملاء"):
@@ -320,8 +293,9 @@ else:
     records = get_records(selected_id)
     summary = currency_summary(records)
 
-    # أزرار إضافة دين / تسديد
     btn_col1, btn_col2 = st.columns(2)
+    
+    # زر التسديد (أخضر) - الترتيب: المبلغ -> العملة -> الملاحظات -> التاريخ والوقت
     with btn_col1:
         with st.popover("🟢 تسجيل تسديد", use_container_width=True):
             with st.form("pay_form", clear_on_submit=True):
@@ -331,12 +305,13 @@ else:
                 p_date = st.text_input("تاريخ الحركة", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
                 if st.form_submit_button("↓ تسديد", use_container_width=True):
                     try:
-                        add_record(selected_id, "تسديد", float(p_amount), p_curr, p_note)
+                        add_record(selected_id, "تسديد", float(p_amount), p_curr, p_note, p_date)
                         st.success("تم الحفظ")
                         st.rerun()
                     except:
                         st.error("أدخل مبلغ صحيح")
 
+    # زر إضافة دين (أحمر) - الترتيب: المبلغ -> العملة -> الملاحظات -> التاريخ والوقت
     with btn_col2:
         with st.popover("🔴 إضافة دين", use_container_width=True):
             with st.form("debt_form", clear_on_submit=True):
@@ -346,7 +321,7 @@ else:
                 d_date = st.text_input("تاريخ الحركة", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
                 if st.form_submit_button("↑ إضافة دين", use_container_width=True):
                     try:
-                        add_record(selected_id, "دين", float(d_amount), d_curr, d_note)
+                        add_record(selected_id, "دين", float(d_amount), d_curr, d_note, d_date)
                         st.success("تم الحفظ")
                         st.rerun()
                     except:
