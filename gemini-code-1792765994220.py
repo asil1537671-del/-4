@@ -1,4 +1,4 @@
-import streamlit as st
+Import streamlit as st
 import streamlit.components.v1 as components
 import sqlite3
 from pathlib import Path
@@ -55,29 +55,67 @@ html, body, [class*="css"], [data-testid="stAppViewContainer"] {
     font-family: 'Cairo', sans-serif;
 }
 .stApp {
-    background: #f8fafc;
+    background: linear-gradient(180deg, #f5f8ff 0%, #f8fafc 48%, #f3f6fb 100%);
     color: #172033;
 }
 [data-testid="stHeader"] { background: rgba(0,0,0,0); }
-.block-container { padding-top: 1rem; padding-bottom: 5rem; max-width: 1400px; }
-
+.block-container { padding-top: 1.2rem; padding-bottom: 5rem; max-width: 1400px; }
+h1, h2, h3 { color: #14213d; }
+div.stButton > button, div.stFormSubmitButton > button {
+    border-radius: 12px;
+    min-height: 2.7rem;
+    font-weight: 700;
+    border: 1px solid #d7e0ef;
+    transition: all .15s ease;
+}
+div.stButton > button:hover, div.stFormSubmitButton > button:hover {
+    border-color: #2563eb;
+    color: #1d4ed8;
+}
+/* بطاقات الإحصائيات المصغّرة */
 .metric-card {
     background: white;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #e5eaf3;
     border-radius: 12px;
-    padding: 12px 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    padding: 8px 10px;
+    box-shadow: 0 2px 8px rgba(25, 45, 85, .04);
+    min-height: 72px;
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
-.metric-label { color: #64748b; font-size: 0.85rem; font-weight: 600; }
-.metric-value { font-size: 1.25rem; font-weight: 800; margin-top: 4px; }
+.metric-label { color: #64748b; font-size: .74rem; font-weight: 600; line-height: 1.2; }
+.metric-value { color: #14213d; font-size: 1.05rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
+.metric-sub { color: #94a3b8; font-size: .66rem; margin-top: 2px; line-height: 1.2; }
+.panel {
+    background: white;
+    border: 1px solid #e5eaf3;
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 6px 20px rgba(25, 45, 85, .04);
+}
+div[data-testid="stExpander"] {
+    background: rgba(255,255,255,.82);
+    border: 1px solid #e5eaf3;
+    border-radius: 14px;
+}
+[data-testid="stSidebar"] { background: #eef3fb; }
 </style>
 """, unsafe_allow_html=True)
 
 def money(value):
     return f"{value:,.2f}".rstrip("0").rstrip(".")
+
+def metric_card(label, value, accent="#2563eb", sub=""):
+    sub_html = f'<div class="metric-sub">{sub}</div>' if sub else ""
+    st.markdown(
+        f"""<div class="metric-card">
+          <div class="metric-label">{label}</div>
+          <div class="metric-value" style="color:{accent}">{value}</div>
+          {sub_html}
+        </div>""",
+        unsafe_allow_html=True
+    )
 
 def get_customers(search=""):
     with get_conn() as conn:
@@ -115,15 +153,22 @@ def add_customer(name):
             (name.strip(), datetime.now().strftime("%Y-%m-%d %H:%M"))
         )
 
-def add_record(customer_id, kind, amount, currency, note, created_at):
+def add_record(customer_id, kind, amount, currency, note):
     with get_conn() as conn:
         conn.execute(
             """INSERT INTO records(customer_id, type, amount, currency, note, created_at)
                VALUES(?, ?, ?, ?, ?, ?)""",
-            (customer_id, kind, float(amount), currency, note.strip(), created_at)
+            (customer_id, kind, float(amount), currency, note.strip(),
+             datetime.now().strftime("%Y-%m-%d %H:%M"))
         )
 
-# ---------- الحاسبة السوداء الاحترافية المحدثة ----------
+def clear_search():
+    st.session_state["customer_search"] = ""
+
+# ---------- Floating Calculator ----------
+# ملاحظة: st.markdown لا ينفّذ وسوم <script>، ولهذا كانت الحاسبة لا تستجيب.
+# الحل: نحقن الحاسبة (HTML + CSS + JS) مرة واحدة داخل صفحة Streamlit نفسها،
+# فتبقى تعمل بين كل إعادة تشغيل وبين الصفحات، وزر واحد يفتح ويغلق.
 CALC_HTML = r"""
 <script>
 (function () {
@@ -132,51 +177,44 @@ CALC_HTML = r"""
   if (hostDoc.getElementById("fcalc-script")) return;
 
   function init() {
-    if (hostDoc.getElementById("fcalc-root")) return;
+    if (document.getElementById("fcalc-root")) return;
 
-    var style = hostDoc.createElement("style");
+    var style = document.createElement("style");
     style.id = "fcalc-style";
     style.textContent = `
       #fcalc-btn {
         position: fixed; bottom: 25px; left: 25px; z-index: 999999;
         width: 55px; height: 55px; border: none; border-radius: 50%;
-        background: #000000; color: #fff; font-size: 24px; cursor: pointer;
-        box-shadow: 0 4px 20px rgba(0,0,0,.5);
+        background: #2563eb; color: #fff; font-size: 24px; cursor: pointer;
+        box-shadow: 0 4px 20px rgba(37,99,235,.4);
         display: flex; align-items: center; justify-content: center;
         transition: transform .2s;
       }
       #fcalc-btn:hover { transform: scale(1.1); }
       #fcalc-box {
         position: fixed; bottom: 95px; left: 25px; z-index: 999999;
-        width: 280px; padding: 20px; border-radius: 20px;
-        background: #000000; color: #fff; display: none;
-        box-shadow: 0 10px 30px rgba(0,0,0,.5);
-        border: 1px solid #333;
+        width: 280px; padding: 15px; border-radius: 16px;
+        background: #172033; color: #fff; display: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,.4);
       }
       #fcalc-box.open { display: block; }
       #fcalc-display {
-        box-sizing: border-box; width: 100%; height: 55px; border: 0;
-        border-radius: 10px; background: #1c1c1c; color: #ffffff;
-        text-align: right; font-size: 28px; padding: 10px; margin-bottom: 15px;
-        direction: ltr; font-family: monospace;
+        box-sizing: border-box; width: 100%; height: 45px; border: 0;
+        border-radius: 8px; background: #0b1220; color: #67e8f9;
+        text-align: right; font-size: 22px; padding: 7px; margin-bottom: 10px;
+        direction: ltr;
       }
-      #fcalc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-      #fcalc-grid button {
-        border: 0; border-radius: 50%; width: 50px; height: 50px;
-        background: #333333; color: #ffffff; font-size: 18px; 
-        cursor: pointer; display: flex; align-items: center; 
-        justify-content: center; transition: background .2s;
+      #fcalc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+      #fcalc-grid button, #fcalc-clear {
+        border: 0; border-radius: 8px; padding: 10px; background: #334155;
+        color: #fff; font-size: 16px; cursor: pointer;
       }
-      #fcalc-grid button:hover { background: #555555; }
-      #fcalc-grid button.operator { background: #ff9500; color: #ffffff; }
-      #fcalc-grid button.operator:hover { background: #e08500; }
-      #fcalc-grid button.clear { background: #a5a5a5; color: #000000; }
-      #fcalc-grid button.clear:hover { background: #d4d4d4; }
-      #fcalc-grid button.zero { border-radius: 30px; width: 110px; grid-column: span 2; justify-content: flex-start; padding-left: 20px; }
+      #fcalc-grid button:hover { background: #475569; }
+      #fcalc-clear { grid-column: span 4; background: #dc2626; }
     `;
-    hostDoc.head.appendChild(style);
+    document.head.appendChild(style);
 
-    var root = hostDoc.createElement("div");
+    var root = document.createElement("div");
     root.id = "fcalc-root";
     root.innerHTML =
       '<button id="fcalc-btn" type="button" title="الحاسبة">🧮</button>' +
@@ -184,30 +222,33 @@ CALC_HTML = r"""
       '  <input id="fcalc-display" readonly value="">' +
       '  <div id="fcalc-grid"></div>' +
       '</div>';
-    hostDoc.body.appendChild(root);
+    document.body.appendChild(root);
 
-    var box = hostDoc.getElementById("fcalc-box");
-    var btn = hostDoc.getElementById("fcalc-btn");
-    var display = hostDoc.getElementById("fcalc-display");
-    var grid = hostDoc.getElementById("fcalc-grid");
+    var box = document.getElementById("fcalc-box");
+    var btn = document.getElementById("fcalc-btn");
+    var display = document.getElementById("fcalc-display");
+    var grid = document.getElementById("fcalc-grid");
 
-    var safeLayout = [
-        {k: "C", t: "C", c: "clear"}, {k: "(", t: "(", c: "clear"}, {k: ")", t: ")", c: "clear"}, {k: "/", t: "÷", c: "operator"},
-        {k: "7", t: "7", c: ""}, {k: "8", t: "8", c: ""}, {k: "9", t: "9", c: ""}, {k: "*", t: "×", c: "operator"},
-        {k: "4", t: "4", c: ""}, {k: "5", t: "5", c: ""}, {k: "6", t: "6", c: ""}, {k: "-", t: "−", c: "operator"},
-        {k: "1", t: "1", c: ""}, {k: "2", t: "2", c: ""}, {k: "3", t: "3", c: ""}, {k: "+", t: "+", c: "operator"},
-        {k: "0", t: "0", c: "zero"}, {k: ".", t: ".", c: ""}, {k: "=", t: "=", c: "operator"}
+    var keys = [
+      ["7","7"],["8","8"],["9","9"],["/","÷"],
+      ["4","4"],["5","5"],["6","6"],["*","×"],
+      ["1","1"],["2","2"],["3","3"],["-","−"],
+      ["0","0"],[".","."],["=","="],["+","+"]
     ];
-
-    safeLayout.forEach(function (item) {
-      var b = hostDoc.createElement("button");
+    keys.forEach(function (k) {
+      var b = document.createElement("button");
       b.type = "button";
-      b.textContent = item.t;
-      b.setAttribute("data-k", item.k);
-      if (item.c) b.className = item.c;
+      b.textContent = k[1];
+      b.setAttribute("data-k", k[0]);
       grid.appendChild(b);
     });
+    var clr = document.createElement("button");
+    clr.type = "button";
+    clr.id = "fcalc-clear";
+    clr.textContent = "مسح C";
+    grid.appendChild(clr);
 
+    // ضغطة واحدة: فتح / إغلاق
     btn.addEventListener("click", function () {
       box.classList.toggle("open");
     });
@@ -226,8 +267,7 @@ CALC_HTML = r"""
 
     grid.addEventListener("click", function (e) {
       var t = e.target;
-      if (t.tagName !== "BUTTON") return;
-      if (t.getAttribute("data-k") === "C") { display.value = ""; return; }
+      if (t.id === "fcalc-clear") { display.value = ""; return; }
       var k = t.getAttribute("data-k");
       if (!k) return;
       if (display.value === "خطأ") display.value = "";
@@ -244,119 +284,251 @@ CALC_HTML = r"""
 </script>
 """
 
-components.html(CALC_HTML, height=0)
+def floating_calculator():
+    components.html(CALC_HTML, height=0)
 
-# ---------- State Management ----------
+# ---------- Header / navigation ----------
 if "selected_customer_id" not in st.session_state:
     st.session_state.selected_customer_id = None
 
 selected_id = st.session_state.selected_customer_id
 
-st.title("📒 دفتر ديوني")
+top_left, top_right = st.columns([9, 1])
+with top_left:
+    st.markdown("# 📒 دفتر ديوني")
+    st.caption("إدارة الديون والتسديدات بطريقة مرتبة وواضحة")
+with top_right:
+    # أيقونة البحث في الزاوية العلوية اليمنى، والشريط يفتح عند الضغط عليها فقط
+    if selected_id is None:
+        st.markdown("<div style='padding-top:14px'></div>", unsafe_allow_html=True)
+        with st.popover("🔎", use_container_width=True, help="بحث عن عميل"):
+            st.text_input(
+                "ابحث عن عميل",
+                placeholder="اكتب جزءًا من الاسم...",
+                key="customer_search",
+            )
 
-# ---------- الصفحة الرئيسية ----------
-if selected_id is None:
+# تشغيل الحاسبة العائمة في كل الصفحات
+floating_calculator()
+
+# ---------- Customer details ----------
+if selected_id is not None:
+    customer = get_customer(selected_id)
+    if customer is None:
+        st.session_state.selected_customer_id = None
+        st.rerun()
+
+    if st.button("⬅️ العودة إلى قائمة العملاء", key="back_customers"):
+        st.session_state.selected_customer_id = None
+        st.rerun()
+
+    st.markdown(f"## 👤 سجل العميل: {customer['name']}")
+    records = get_records(selected_id)
+    summary = currency_summary(records)
+
+    # كل الإحصائيات في صف واحد
+    stat_cols = st.columns(6)
+    with stat_cols[0]:
+        metric_card("عدد العمليات", str(len(records)), "#2563eb")
+    with stat_cols[1]:
+        metric_card("الديون", str(sum(1 for r in records if r["type"] == "دين")), "#dc2626")
+    with stat_cols[2]:
+        metric_card("التسديدات", str(sum(1 for r in records if r["type"] == "تسديد")), "#059669")
+    for i, currency in enumerate(CURRENCIES):
+        s = summary[currency]
+        with stat_cols[3 + i]:
+            metric_card(
+                f"المتبقي — {currency}",
+                money(s["remaining"]),
+                "#dc2626" if s["remaining"] > 0 else "#059669",
+                f"دين {money(s['debt'])} · مسدد {money(s['paid'])}",
+            )
+
+    st.markdown("---")
+    add_col, pay_col = st.columns(2)
+    with add_col:
+        with st.form("add_debt_form", clear_on_submit=True):
+            st.subheader("➕ إضافة دين")
+            d_amount_str = st.text_input("المبلغ", placeholder="اكتب المبلغ مثل 250 أو 250.75", key="debt_amount_str")
+            d_currency = st.selectbox("العملة", CURRENCIES, key="debt_currency")
+            d_note = st.text_input("البيان / الملاحظة", key="debt_note")
+            if st.form_submit_button("حفظ الدين", use_container_width=True):
+                try:
+                    d_amount = float(d_amount_str.strip())
+                    if d_amount <= 0:
+                        raise ValueError
+                    add_record(selected_id, "دين", d_amount, d_currency, d_note)
+                    st.success("تم حفظ الدين.")
+                    st.rerun()
+                except ValueError:
+                    st.error("الرجاء إدخال مبلغ صحيح أكبر من صفر.")
+    with pay_col:
+        with st.form("add_payment_form", clear_on_submit=True):
+            st.subheader("💵 تسجيل تسديد")
+            p_amount_str = st.text_input("مبلغ التسديد", placeholder="اكتب المبلغ مثل 250 أو 250.75", key="pay_amount_str")
+            p_currency = st.selectbox("عملة التسديد", CURRENCIES, key="pay_currency")
+            p_note = st.text_input("بيان التسديد", key="pay_note")
+            if st.form_submit_button("حفظ التسديد", use_container_width=True):
+                try:
+                    p_amount = float(p_amount_str.strip())
+                    if p_amount <= 0:
+                        raise ValueError
+                    add_record(selected_id, "تسديد", p_amount, p_currency, p_note)
+                    st.success("تم تسجيل التسديد.")
+                    st.rerun()
+                except ValueError:
+                    st.error("الرجاء إدخال مبلغ صحيح أكبر من صفر.")
+
+    st.markdown("---")
+    st.markdown("### 📋 سجل العمليات")
+    if not records:
+        st.info("لا توجد عمليات مسجلة لهذا العميل حتى الآن.")
+    else:
+        for rec in records:
+            is_payment = rec["type"] == "تسديد"
+            with st.container(border=True):
+                left, right = st.columns([4, 1])
+                with left:
+                    st.markdown(f"**:{'green' if is_payment else 'red'}[{rec['type']}]** · **{money(rec['amount'])} {rec['currency']}**")
+                    st.caption(f"{rec['created_at']}  ·  {rec['note'] or 'بدون ملاحظة'}")
+                with right:
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        with st.popover("✏️"):
+                            with st.form(f"edit_record_{rec['id']}"):
+                                edit_type = st.selectbox("نوع العملية", ["دين", "تسديد"],
+                                    index=0 if rec["type"] == "دين" else 1, key=f"etype_{rec['id']}")
+                                edit_amount_str = st.text_input("المبلغ",
+                                    value=str(rec["amount"]), key=f"eamount_{rec['id']}")
+                                edit_currency = st.selectbox("العملة", CURRENCIES,
+                                    index=CURRENCIES.index(rec["currency"]) if rec["currency"] in CURRENCIES else 0,
+                                    key=f"ecurr_{rec['id']}")
+                                edit_note = st.text_input("الملاحظة", value=rec["note"] or "", key=f"enote_{rec['id']}")
+                                if st.form_submit_button("حفظ التعديل"):
+                                    try:
+                                        edit_amount = float(edit_amount_str.strip())
+                                        with get_conn() as conn:
+                                            conn.execute("""UPDATE records SET type=?, amount=?, currency=?, note=?
+                                                            WHERE id=? AND customer_id=?""",
+                                                (edit_type, edit_amount, edit_currency, edit_note, rec["id"], selected_id))
+                                        st.success("تم تعديل العملية.")
+                                        st.rerun()
+                                    except ValueError:
+                                        st.error("مبلغ غير صحيح.")
+                    with btn_col2:
+                        if st.button("🗑️", key=f"delete_record_{rec['id']}", help="حذف العملية"):
+                            st.session_state[f"confirm_delete_record_{rec['id']}"] = True
+
+                if st.session_state.get(f"confirm_delete_record_{rec['id']}", False):
+                    st.warning("هل تريد حذف هذه العملية نهائيًا؟")
+                    yes, no = st.columns(2)
+                    if yes.button("نعم، احذف", key=f"yes_del_rec_{rec['id']}"):
+                        with get_conn() as conn:
+                            conn.execute("DELETE FROM records WHERE id=?", (rec["id"],))
+                        st.session_state.pop(f"confirm_delete_record_{rec['id']}", None)
+                        st.rerun()
+                    if no.button("إلغاء", key=f"no_del_rec_{rec['id']}"):
+                        st.session_state.pop(f"confirm_delete_record_{rec['id']}", None)
+                        st.rerun()
+
+    with st.expander("⚠️ حذف العميل بالكامل"):
+        st.warning("سيتم حذف العميل وجميع سجلاته من قاعدة البيانات. لا يمكن التراجع عن هذا الإجراء.")
+        if st.button("حذف العميل وسجلاته", type="primary", key="delete_customer"):
+            st.session_state.confirm_delete_customer = selected_id
+        if st.session_state.get("confirm_delete_customer") == selected_id:
+            st.error("تأكيد أخير: حذف العميل وكل سجلاته؟")
+            yes, no = st.columns(2)
+            if yes.button("نعم، احذف العميل", key="confirm_customer_delete"):
+                with get_conn() as conn:
+                    conn.execute("DELETE FROM records WHERE customer_id=?", (selected_id,))
+                    conn.execute("DELETE FROM customers WHERE id=?", (selected_id,))
+                st.session_state.selected_customer_id = None
+                st.session_state.pop("confirm_delete_customer", None)
+                st.rerun()
+            if no.button("إلغاء", key="cancel_customer_delete"):
+                st.session_state.pop("confirm_delete_customer", None)
+                st.rerun()
+
+# ---------- Main dashboard ----------
+else:
     customers = get_customers()
     all_records = []
     for c in customers:
         all_records.extend(get_records(c["id"]))
 
-    # الإحصائيات جنباً إلى جنب تماماً
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">إجمالي العملاء</div><div class="metric-value" style="color:#2563eb">{len(customers)}</div></div>', unsafe_allow_html=True)
-    with col2:
-        total_debt = sum(1 for r in all_records if r["type"] == "دين")
-        st.markdown(f'<div class="metric-card"><div class="metric-label">عمليات الديون</div><div class="metric-value" style="color:#ef4444">{total_debt}</div></div>', unsafe_allow_html=True)
-    with col3:
-        total_pay = sum(1 for r in all_records if r["type"] == "تسديد")
-        st.markdown(f'<div class="metric-card"><div class="metric-label">عمليات التسديد</div><div class="metric-value" style="color:#10b981">{total_pay}</div></div>', unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    with st.expander("➕ إضافة عميل جديد"):
-        with st.form("add_cust_form", clear_on_submit=True):
-            c_name = st.text_input("اسم العميل")
+    # نموذج إضافة عميل جديد في أعلى الصفحة
+    with st.expander("➕ إضافة عميل جديد", expanded=not bool(customers)):
+        with st.form("new_customer_form", clear_on_submit=True):
+            new_name = st.text_input("اسم العميل", placeholder="اكتب اسم العميل هنا")
             if st.form_submit_button("حفظ العميل", use_container_width=True):
-                if c_name.strip():
+                if not new_name.strip():
+                    st.error("اكتب اسم العميل أولًا.")
+                else:
                     try:
-                        add_customer(c_name)
-                        st.success("تمت الإضافة")
+                        add_customer(new_name)
+                        st.success("تمت إضافة العميل بنجاح.")
                         st.rerun()
-                    except:
-                        st.error("الاسم موجود مسبقاً")
+                    except sqlite3.IntegrityError:
+                        st.error("هذا الاسم موجود مسبقًا.")
 
-    st.subheader("👥 سجل العملاء")
-    for customer in customers:
-        records = get_records(customer["id"])
-        summary = currency_summary(records)
-        with st.container(border=True):
-            c_col1, c_col2 = st.columns([3, 1])
-            with c_col1:
-                st.markdown(f"### 👤 {customer['name']}")
-                parts = [f"{money(summary[cur]['remaining'])} {cur}" for cur in CURRENCIES if summary[cur]["debt"] > 0 or summary[cur]["paid"] > 0]
-                st.caption("المتبقي: " + (" | ".join(parts) if parts else "0"))
-            with c_col2:
-                if st.button("عرض السجل", key=f"cust_{customer['id']}", use_container_width=True):
-                    st.session_state.selected_customer_id = customer["id"]
-                    st.rerun()
+    # كل الإحصائيات في صف واحد مصغّر
+    total_debt_count = sum(1 for r in all_records if r["type"] == "دين")
+    total_payment_count = sum(1 for r in all_records if r["type"] == "تسديد")
+    overall = currency_summary(all_records)
 
-# ---------- واجهة تفاصيل العميل ----------
-else:
-    customer = get_customer(selected_id)
-    if st.button("⬅️ العودة للعملاء"):
-        st.session_state.selected_customer_id = None
-        st.rerun()
-
-    st.subheader(f"👤 العميل: {customer['name']}")
-    records = get_records(selected_id)
-    summary = currency_summary(records)
-
-    btn_col1, btn_col2 = st.columns(2)
-    
-    # زر التسديد (أخضر) - الترتيب: المبلغ -> العملة -> الملاحظات -> التاريخ والوقت
-    with btn_col1:
-        with st.popover("🟢 تسجيل تسديد", use_container_width=True):
-            with st.form("pay_form", clear_on_submit=True):
-                p_amount = st.text_input("المبلغ")
-                p_curr = st.selectbox("العملة", CURRENCIES)
-                p_note = st.text_input("الملاحظات (اختياري)")
-                p_date = st.text_input("تاريخ الحركة", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
-                if st.form_submit_button("↓ تسديد", use_container_width=True):
-                    try:
-                        add_record(selected_id, "تسديد", float(p_amount), p_curr, p_note, p_date)
-                        st.success("تم الحفظ")
-                        st.rerun()
-                    except:
-                        st.error("أدخل مبلغ صحيح")
-
-    # زر إضافة دين (أحمر) - الترتيب: المبلغ -> العملة -> الملاحظات -> التاريخ والوقت
-    with btn_col2:
-        with st.popover("🔴 إضافة دين", use_container_width=True):
-            with st.form("debt_form", clear_on_submit=True):
-                d_amount = st.text_input("المبلغ")
-                d_curr = st.selectbox("العملة", CURRENCIES)
-                d_note = st.text_input("الملاحظات (اختياري)")
-                d_date = st.text_input("تاريخ الحركة", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
-                if st.form_submit_button("↑ إضافة دين", use_container_width=True):
-                    try:
-                        add_record(selected_id, "دين", float(d_amount), d_curr, d_note, d_date)
-                        st.success("تم الحفظ")
-                        st.rerun()
-                    except:
-                        st.error("أدخل مبلغ صحيح")
+    # مجموعتان منظمتان في صف واحد: نظرة عامة | الإجماليات حسب العملة
+    group_overview, group_totals = st.columns(2, gap="large")
+    with group_overview:
+        st.caption("📊 نظرة عامة")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            metric_card("عدد العملاء", str(len(customers)), "#2563eb")
+        with c2:
+            metric_card("عمليات الديون", str(total_debt_count), "#dc2626")
+        with c3:
+            metric_card("عمليات التسديد", str(total_payment_count), "#059669")
+    with group_totals:
+        st.caption("💱 الإجماليات حسب العملة (المتبقي)")
+        currency_cols = st.columns(3)
+        for i, currency in enumerate(CURRENCIES):
+            s = overall[currency]
+            with currency_cols[i]:
+                metric_card(
+                    currency,
+                    money(s["remaining"]),
+                    "#dc2626" if s["remaining"] > 0 else "#059669",
+                    f"ديون {money(s['debt'])} · تسديدات {money(s['paid'])}",
+                )
 
     st.markdown("---")
-    st.markdown("### المعاملات")
-    for r in records:
-        color = "#10b981" if r["type"] == "تسديد" else "#ef4444"
-        with st.container(border=True):
-            r_col1, r_col2 = st.columns([4, 1])
-            with r_col1:
-                st.markdown(f"<h4 style='color:{color}; margin:0;'>{r['type']} : {money(r['amount'])} {r['currency']}</h4>", unsafe_allow_html=True)
-                st.caption(f"{r['created_at']} | {r['note']}")
-            with r_col2:
-                if st.button("🗑️", key=f"del_{r['id']}"):
-                    with get_conn() as conn:
-                        conn.execute("DELETE FROM records WHERE id=?", (r["id"],))
-                    st.rerun()
+    st.markdown("### 👥 العملاء")
+
+    search = st.session_state.get("customer_search", "")
+    if search.strip():
+        info_col, clear_col = st.columns([5, 1])
+        info_col.caption(f"نتائج البحث عن: «{search.strip()}»")
+        clear_col.button("✖ إلغاء البحث", on_click=clear_search, use_container_width=True)
+
+    shown_customers = get_customers(search)
+
+    if not shown_customers:
+        st.info("لا يوجد عملاء مطابقون. أضف عميلًا جديدًا من الأعلى.")
+    else:
+        for customer in shown_customers:
+            records = get_records(customer["id"])
+            summary = currency_summary(records)
+            with st.container(border=True):
+                name_col, balance_col, action_col = st.columns([3, 3, 1.5])
+                with name_col:
+                    st.markdown(f"**👤 {customer['name']}**")
+                    st.caption(f"عدد العمليات: {len(records)}")
+                with balance_col:
+                    parts = [f"{money(summary[cur]['remaining'])} {cur}" for cur in CURRENCIES
+                             if summary[cur]["debt"] != 0 or summary[cur]["paid"] != 0]
+                    st.markdown("**المتبقي:** " + (" · ".join(parts) if parts else "لا توجد ديون"))
+                with action_col:
+                    if st.button("فتح السجل", key=f"open_customer_{customer['id']}", use_container_width=True):
+                        st.session_state.selected_customer_id = customer["id"]
+                        st.rerun()
+
+    st.caption("تُحفظ البيانات محليًا في ملف SQLite بجانب ملف البرنامج. خذ نسخة احتياطية من ملف daftar_deyoon.db بشكل دوري.")
