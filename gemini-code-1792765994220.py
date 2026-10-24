@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import sqlite3
 from pathlib import Path
 from datetime import datetime
@@ -71,16 +72,21 @@ div.stButton > button:hover, div.stFormSubmitButton > button:hover {
     border-color: #2563eb;
     color: #1d4ed8;
 }
+/* بطاقات الإحصائيات المصغّرة */
 .metric-card {
     background: white;
     border: 1px solid #e5eaf3;
-    border-radius: 18px;
-    padding: 14px 12px;
-    box-shadow: 0 4px 15px rgba(25, 45, 85, .04);
-    min-height: 90px;
+    border-radius: 12px;
+    padding: 8px 10px;
+    box-shadow: 0 2px 8px rgba(25, 45, 85, .04);
+    min-height: 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
-.metric-label { color: #64748b; font-size: .85rem; font-weight: 600; }
-.metric-value { color: #14213d; font-size: 1.35rem; font-weight: 800; margin-top: 4px; }
+.metric-label { color: #64748b; font-size: .74rem; font-weight: 600; line-height: 1.2; }
+.metric-value { color: #14213d; font-size: 1.05rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
+.metric-sub { color: #94a3b8; font-size: .66rem; margin-top: 2px; line-height: 1.2; }
 .panel {
     background: white;
     border: 1px solid #e5eaf3;
@@ -100,11 +106,13 @@ div[data-testid="stExpander"] {
 def money(value):
     return f"{value:,.2f}".rstrip("0").rstrip(".")
 
-def metric_card(label, value, accent="#2563eb"):
+def metric_card(label, value, accent="#2563eb", sub=""):
+    sub_html = f'<div class="metric-sub">{sub}</div>' if sub else ""
     st.markdown(
         f"""<div class="metric-card">
           <div class="metric-label">{label}</div>
           <div class="metric-value" style="color:{accent}">{value}</div>
+          {sub_html}
         </div>""",
         unsafe_allow_html=True
     )
@@ -154,126 +162,154 @@ def add_record(customer_id, kind, amount, currency, note):
              datetime.now().strftime("%Y-%m-%d %H:%M"))
         )
 
-# ---------- Floating Bubble Calculator (Works everywhere) ----------
-def floating_calculator():
-    st.markdown("""
-    <style>
-    .floating-calc-btn {
-        position: fixed;
-        bottom: 25px;
-        left: 25px;
-        z-index: 999999;
-        background: #2563eb;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 55px;
-        height: 55px;
-        font-size: 24px;
-        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: transform 0.2s;
-    }
-    .floating-calc-btn:hover {
-        transform: scale(1.1);
-    }
-    .floating-calc-box {
-        position: fixed;
-        bottom: 95px;
-        left: 25px;
-        z-index: 999999;
-        width: 280px;
-        background: #172033;
-        color: white;
-        padding: 15px;
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-        display: none;
-    }
-    .floating-calc-box input {
-        box-sizing: border-box;
-        width: 100%;
-        height: 45px;
-        border: 0;
-        border-radius: 8px;
-        background: #0b1220;
-        color: #67e8f9;
-        text-align: right;
-        font-size: 22px;
-        padding: 7px;
-        margin-bottom: 10px;
-    }
-    .floating-calc-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 6px;
-    }
-    .floating-calc-grid button {
-        border: 0;
-        border-radius: 8px;
-        padding: 10px;
-        background: #334155;
-        color: white;
-        font-size: 16px;
-        cursor: pointer;
-    }
-    .floating-calc-grid button:hover {
-        background: #475569;
-    }
-    </style>
+def clear_search():
+    st.session_state["customer_search"] = ""
 
-    <button class="floating-calc-btn" onclick="toggleCalc()" title="الحاسبة العائمة">🧮</button>
+# ---------- Floating Calculator ----------
+# ملاحظة: st.markdown لا ينفّذ وسوم <script>، ولهذا كانت الحاسبة لا تستجيب.
+# الحل: نحقن الحاسبة (HTML + CSS + JS) مرة واحدة داخل صفحة Streamlit نفسها،
+# فتبقى تعمل بين كل إعادة تشغيل وبين الصفحات، وزر واحد يفتح ويغلق.
+CALC_HTML = r"""
+<script>
+(function () {
+  var host = window.parent;
+  var hostDoc = host.document;
+  if (hostDoc.getElementById("fcalc-script")) return;
 
-    <div class="floating-calc-box" id="floatingCalcBox" dir="ltr">
-      <input id="calc-display" readonly value="">
-      <div class="floating-calc-grid">
-        <button onclick="add('7')">7</button><button onclick="add('8')">8</button>
-        <button onclick="add('9')">9</button><button onclick="add('/')">÷</button>
-        <button onclick="add('4')">4</button><button onclick="add('5')">5</button>
-        <button onclick="add('6')">6</button><button onclick="add('*')">×</button>
-        <button onclick="add('1')">1</button><button onclick="add('2')">2</button>
-        <button onclick="add('3')">3</button><button onclick="add('-')">−</button>
-        <button onclick="add('0')">0</button><button onclick="add('.')">.</button>
-        <button onclick="calc()">=</button><button onclick="add('+')">+</button>
-        <button onclick="clr()" style="grid-column:span 4;background:#dc2626;color:white">مسح C</button>
-      </div>
-    </div>
+  function init() {
+    if (document.getElementById("fcalc-root")) return;
 
-    <script>
-    function toggleCalc() {
-        const box = document.getElementById('floatingCalcBox');
-        box.style.display = box.style.display === 'block' ? 'none' : 'block';
-    }
-    const d = document.getElementById('calc-display');
-    function add(v) { d.value += v; }
-    function clr() { d.value = ''; }
-    function calc() {
+    var style = document.createElement("style");
+    style.id = "fcalc-style";
+    style.textContent = `
+      #fcalc-btn {
+        position: fixed; bottom: 25px; left: 25px; z-index: 999999;
+        width: 55px; height: 55px; border: none; border-radius: 50%;
+        background: #2563eb; color: #fff; font-size: 24px; cursor: pointer;
+        box-shadow: 0 4px 20px rgba(37,99,235,.4);
+        display: flex; align-items: center; justify-content: center;
+        transition: transform .2s;
+      }
+      #fcalc-btn:hover { transform: scale(1.1); }
+      #fcalc-box {
+        position: fixed; bottom: 95px; left: 25px; z-index: 999999;
+        width: 280px; padding: 15px; border-radius: 16px;
+        background: #172033; color: #fff; display: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,.4);
+      }
+      #fcalc-box.open { display: block; }
+      #fcalc-display {
+        box-sizing: border-box; width: 100%; height: 45px; border: 0;
+        border-radius: 8px; background: #0b1220; color: #67e8f9;
+        text-align: right; font-size: 22px; padding: 7px; margin-bottom: 10px;
+        direction: ltr;
+      }
+      #fcalc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+      #fcalc-grid button, #fcalc-clear {
+        border: 0; border-radius: 8px; padding: 10px; background: #334155;
+        color: #fff; font-size: 16px; cursor: pointer;
+      }
+      #fcalc-grid button:hover { background: #475569; }
+      #fcalc-clear { grid-column: span 4; background: #dc2626; }
+    `;
+    document.head.appendChild(style);
+
+    var root = document.createElement("div");
+    root.id = "fcalc-root";
+    root.innerHTML =
+      '<button id="fcalc-btn" type="button" title="الحاسبة">🧮</button>' +
+      '<div id="fcalc-box" dir="ltr">' +
+      '  <input id="fcalc-display" readonly value="">' +
+      '  <div id="fcalc-grid"></div>' +
+      '</div>';
+    document.body.appendChild(root);
+
+    var box = document.getElementById("fcalc-box");
+    var btn = document.getElementById("fcalc-btn");
+    var display = document.getElementById("fcalc-display");
+    var grid = document.getElementById("fcalc-grid");
+
+    var keys = [
+      ["7","7"],["8","8"],["9","9"],["/","÷"],
+      ["4","4"],["5","5"],["6","6"],["*","×"],
+      ["1","1"],["2","2"],["3","3"],["-","−"],
+      ["0","0"],[".","."],["=","="],["+","+"]
+    ];
+    keys.forEach(function (k) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = k[1];
+      b.setAttribute("data-k", k[0]);
+      grid.appendChild(b);
+    });
+    var clr = document.createElement("button");
+    clr.type = "button";
+    clr.id = "fcalc-clear";
+    clr.textContent = "مسح C";
+    grid.appendChild(clr);
+
+    // ضغطة واحدة: فتح / إغلاق
+    btn.addEventListener("click", function () {
+      box.classList.toggle("open");
+    });
+
+    function calculate() {
       try {
-        if(!/^[0-9+\\-*/.() ]+$/.test(d.value)) throw 0;
-        d.value = Function('"use strict";return (' + d.value + ')')();
-      } catch(e) { d.value = 'خطأ'; }
+        var expr = display.value;
+        if (!/^[0-9+\-*\/.() ]+$/.test(expr)) throw 0;
+        var result = Function('"use strict";return (' + expr + ')')();
+        if (typeof result !== "number" || !isFinite(result)) throw 0;
+        display.value = String(parseFloat(result.toFixed(10)));
+      } catch (e) {
+        display.value = "خطأ";
+      }
     }
-    </script>
-    """, unsafe_allow_html=True)
+
+    grid.addEventListener("click", function (e) {
+      var t = e.target;
+      if (t.id === "fcalc-clear") { display.value = ""; return; }
+      var k = t.getAttribute("data-k");
+      if (!k) return;
+      if (display.value === "خطأ") display.value = "";
+      if (k === "=") calculate();
+      else display.value += k;
+    });
+  }
+
+  var s = hostDoc.createElement("script");
+  s.id = "fcalc-script";
+  s.textContent = "(" + init.toString() + ")();";
+  hostDoc.body.appendChild(s);
+})();
+</script>
+"""
+
+def floating_calculator():
+    components.html(CALC_HTML, height=0)
 
 # ---------- Header / navigation ----------
 if "selected_customer_id" not in st.session_state:
     st.session_state.selected_customer_id = None
 
-top_left, top_right = st.columns([4, 1])
+selected_id = st.session_state.selected_customer_id
+
+top_left, top_right = st.columns([9, 1])
 with top_left:
     st.markdown("# 📒 دفتر ديوني")
     st.caption("إدارة الديون والتسديدات بطريقة مرتبة وواضحة")
 with top_right:
-    st.markdown("<div style='text-align:left;padding-top:15px;color:#64748b'>نسخة مطوّرة</div>", unsafe_allow_html=True)
+    # أيقونة البحث في الزاوية العلوية اليمنى، والشريط يفتح عند الضغط عليها فقط
+    if selected_id is None:
+        st.markdown("<div style='padding-top:14px'></div>", unsafe_allow_html=True)
+        with st.popover("🔎", use_container_width=True, help="بحث عن عميل"):
+            st.text_input(
+                "ابحث عن عميل",
+                placeholder="اكتب جزءًا من الاسم...",
+                key="customer_search",
+            )
 
-# تشغيل فقاعة الحاسبة العائمة في كل مكان
+# تشغيل الحاسبة العائمة في كل الصفحات
 floating_calculator()
-
-selected_id = st.session_state.selected_customer_id
 
 # ---------- Customer details ----------
 if selected_id is not None:
@@ -290,19 +326,23 @@ if selected_id is not None:
     records = get_records(selected_id)
     summary = currency_summary(records)
 
-    metric_cols = st.columns(3)
-    total_records = len(records)
-    metric_cols[0].metric("عدد العمليات", total_records)
-    metric_cols[1].metric("الديون", sum(1 for r in records if r["type"] == "دين"))
-    metric_cols[2].metric("التسديدات", sum(1 for r in records if r["type"] == "تسديد"))
-
-    st.markdown("### 💱 الرصيد حسب العملة")
-    cols = st.columns(3)
+    # كل الإحصائيات في صف واحد
+    stat_cols = st.columns(6)
+    with stat_cols[0]:
+        metric_card("عدد العمليات", str(len(records)), "#2563eb")
+    with stat_cols[1]:
+        metric_card("الديون", str(sum(1 for r in records if r["type"] == "دين")), "#dc2626")
+    with stat_cols[2]:
+        metric_card("التسديدات", str(sum(1 for r in records if r["type"] == "تسديد")), "#059669")
     for i, currency in enumerate(CURRENCIES):
         s = summary[currency]
-        with cols[i]:
-            metric_card(f"المتبقي — {currency}", money(s["remaining"]), "#dc2626" if s["remaining"] > 0 else "#059669")
-            st.caption(f"الدين: {money(s['debt'])} · المسدد: {money(s['paid'])}")
+        with stat_cols[3 + i]:
+            metric_card(
+                f"المتبقي — {currency}",
+                money(s["remaining"]),
+                "#dc2626" if s["remaining"] > 0 else "#059669",
+                f"دين {money(s['debt'])} · مسدد {money(s['paid'])}",
+            )
 
     st.markdown("---")
     add_col, pay_col = st.columns(2)
@@ -416,28 +456,7 @@ else:
     for c in customers:
         all_records.extend(get_records(c["id"]))
 
-    st.markdown("### 📊 نظرة عامة")
-    total_debt_count = sum(1 for r in all_records if r["type"] == "دين")
-    total_payment_count = sum(1 for r in all_records if r["type"] == "تسديد")
-    
-    overview_cols = st.columns(3)
-    with overview_cols[0]:
-        metric_card("عدد العملاء", str(len(customers)), "#2563eb")
-    with overview_cols[1]:
-        metric_card("عمليات الديون", str(total_debt_count), "#dc2626")
-    with overview_cols[2]:
-        metric_card("عمليات التسديد", str(total_payment_count), "#059669")
-
-    st.markdown("### 💱 إجمالي الأرصدة حسب العملة")
-    overall = currency_summary(all_records)
-    currency_cols = st.columns(3)
-    for i, currency in enumerate(CURRENCIES):
-        s = overall[currency]
-        with currency_cols[i]:
-            metric_card(currency, f"المتبقي: {money(s['remaining'])}", "#dc2626" if s["remaining"] > 0 else "#059669")
-            st.caption(f"الديون {money(s['debt'])} · التسديدات {money(s['paid'])}")
-
-    st.markdown("---")
+    # نموذج إضافة عميل جديد في أعلى الصفحة
     with st.expander("➕ إضافة عميل جديد", expanded=not bool(customers)):
         with st.form("new_customer_form", clear_on_submit=True):
             new_name = st.text_input("اسم العميل", placeholder="اكتب اسم العميل هنا")
@@ -452,12 +471,48 @@ else:
                     except sqlite3.IntegrityError:
                         st.error("هذا الاسم موجود مسبقًا.")
 
+    # كل الإحصائيات في صف واحد مصغّر
+    total_debt_count = sum(1 for r in all_records if r["type"] == "دين")
+    total_payment_count = sum(1 for r in all_records if r["type"] == "تسديد")
+    overall = currency_summary(all_records)
+
+    # مجموعتان منظمتان في صف واحد: نظرة عامة | الإجماليات حسب العملة
+    group_overview, group_totals = st.columns(2, gap="large")
+    with group_overview:
+        st.caption("📊 نظرة عامة")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            metric_card("عدد العملاء", str(len(customers)), "#2563eb")
+        with c2:
+            metric_card("عمليات الديون", str(total_debt_count), "#dc2626")
+        with c3:
+            metric_card("عمليات التسديد", str(total_payment_count), "#059669")
+    with group_totals:
+        st.caption("💱 الإجماليات حسب العملة (المتبقي)")
+        currency_cols = st.columns(3)
+        for i, currency in enumerate(CURRENCIES):
+            s = overall[currency]
+            with currency_cols[i]:
+                metric_card(
+                    currency,
+                    money(s["remaining"]),
+                    "#dc2626" if s["remaining"] > 0 else "#059669",
+                    f"ديون {money(s['debt'])} · تسديدات {money(s['paid'])}",
+                )
+
+    st.markdown("---")
     st.markdown("### 👥 العملاء")
-    search = st.text_input("🔎 ابحث عن عميل", placeholder="اكتب جزءًا من الاسم...")
+
+    search = st.session_state.get("customer_search", "")
+    if search.strip():
+        info_col, clear_col = st.columns([5, 1])
+        info_col.caption(f"نتائج البحث عن: «{search.strip()}»")
+        clear_col.button("✖ إلغاء البحث", on_click=clear_search, use_container_width=True)
+
     shown_customers = get_customers(search)
 
     if not shown_customers:
-        st.info("لا يوجد عملاء مطابقون للبحث. أضف عميلًا جديدًا من الأعلى.")
+        st.info("لا يوجد عملاء مطابقون. أضف عميلًا جديدًا من الأعلى.")
     else:
         for customer in shown_customers:
             records = get_records(customer["id"])
