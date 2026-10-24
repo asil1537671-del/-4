@@ -77,16 +77,16 @@ div.stButton > button:hover, div.stFormSubmitButton > button:hover {
     background: white;
     border: 1px solid #e5eaf3;
     border-radius: 12px;
-    padding: 8px 10px;
+    padding: 10px 12px;
     box-shadow: 0 2px 8px rgba(25, 45, 85, .04);
-    min-height: 72px;
+    min-height: 75px;
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
-.metric-label { color: #64748b; font-size: .74rem; font-weight: 600; line-height: 1.2; }
-.metric-value { color: #14213d; font-size: 1.05rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
-.metric-sub { color: #94a3b8; font-size: .66rem; margin-top: 2px; line-height: 1.2; }
+.metric-label { color: #64748b; font-size: .78rem; font-weight: 600; line-height: 1.2; }
+.metric-value { color: #14213d; font-size: 1.1rem; font-weight: 800; margin-top: 3px; line-height: 1.25; }
+.metric-sub { color: #94a3b8; font-size: .7rem; margin-top: 3px; line-height: 1.2; }
 div[data-testid="stExpander"] {
     background: rgba(255,255,255,.82);
     border: 1px solid #e5eaf3;
@@ -282,20 +282,11 @@ if "selected_customer_id" not in st.session_state:
 
 selected_id = st.session_state.selected_customer_id
 
-top_left, top_right = st.columns([9, 1])
-with top_left:
-    st.markdown("# 📒 دفتر ديوني")
-    st.caption("إدارة الديون والتسديدات بطريقة مرتبة وواضحة")
-with top_right:
-    if selected_id is None:
-        st.markdown("<div style='padding-top:14px'></div>", unsafe_allow_html=True)
-        with st.popover("🔎", use_container_width=True, help="بحث عن عميل"):
-            st.text_input(
-                "ابحث عن عميل",
-                placeholder="اكتب جزءًا من الاسم...",
-                key="customer_search",
-            )
+# العنوان الرئيسي
+st.markdown("# 📒 دفتر ديوني")
+st.caption("إدارة الديون والتسديدات بطريقة مرتبة وواضحة")
 
+# تشغيل الحاسبة العائمة في كل الصفحات
 floating_calculator()
 
 # ---------- Customer details ----------
@@ -437,6 +428,13 @@ if selected_id is not None:
 
 # ---------- Main dashboard ----------
 else:
+    # شريط البحث البارز في الأعلى تماماً مثل الصورة المطلوبة
+    st.text_input(
+        "بحث شامل...",
+        placeholder="🔍 ابحث عن اسم عميل...",
+        key="customer_search",
+    )
+
     customers = get_customers()
     all_records = []
     for c in customers:
@@ -460,9 +458,10 @@ else:
     total_payment_count = sum(1 for r in all_records if r["type"] == "تسديد")
     overall = currency_summary(all_records)
 
+    st.markdown("### 📊 ملخص الإحصائيات")
     group_overview, group_totals = st.columns(2, gap="large")
     with group_overview:
-        st.caption("📊 نظرة عامة")
+        st.caption("نظرة عامة")
         c1, c2, c3 = st.columns(3)
         with c1:
             metric_card("عدد العملاء", str(len(customers)), "#2563eb")
@@ -471,7 +470,7 @@ else:
         with c3:
             metric_card("عمليات التسديد", str(total_payment_count), "#059669")
     with group_totals:
-        st.caption("💱 الإجماليات حسب العملة (المتبقي)")
+        st.caption("الإجماليات حسب العملة (المتبقي)")
         currency_cols = st.columns(3)
         for i, currency in enumerate(CURRENCIES):
             s = overall[currency]
@@ -489,29 +488,4 @@ else:
     search = st.session_state.get("customer_search", "")
     if search.strip():
         info_col, clear_col = st.columns([5, 1])
-        info_col.caption(f"نتائج البحث عن: «{search.strip()}»")
-        clear_col.button("✖ إلغاء البحث", on_click=clear_search, use_container_width=True)
-
-    shown_customers = get_customers(search)
-
-    if not shown_customers:
-        st.info("لا يوجد عملاء مطابقون. أضف عميلًا جديدًا من الأعلى.")
-    else:
-        for customer in shown_customers:
-            records = get_records(customer["id"])
-            summary = currency_summary(records)
-            with st.container(border=True):
-                name_col, balance_col, action_col = st.columns([3, 3, 1.5])
-                with name_col:
-                    st.markdown(f"**👤 {customer['name']}**")
-                    st.caption(f"عدد العمليات: {len(records)}")
-                with balance_col:
-                    parts = [f"{money(summary[cur]['remaining'])} {cur}" for cur in CURRENCIES
-                             if summary[cur]["debt"] != 0 or summary[cur]["paid"] != 0]
-                    st.markdown("**المتبقي:** " + (" · ".join(parts) if parts else "لا توجد ديون"))
-                with action_col:
-                    if st.button("فتح السجل", key=f"open_customer_{customer['id']}", use_container_width=True):
-                        st.session_state.selected_customer_id = customer["id"]
-                        st.rerun()
-
-    st.caption("تُحفظ البيانات محليًا في ملف SQLite بجانب ملف البرنامج. خذ نسخة احتياطية من ملف daftar_deyoon.db بشكل دوري.")
+        info_col.caption(f"نتائج
