@@ -1,25 +1,25 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-
+ 
 import streamlit as st
 import streamlit.components.v1 as components
-
+ 
 APP_DIR = Path(__file__).resolve().parent
 DB_PATH = APP_DIR / "daftar_deyoon.db"
-
+ 
 DEBT = "دين"
 PAYMENT = "تسديد"
 CURRENCIES = ["ريال يمني", "ريال سعودي", "دولار أمريكي"]
-
+ 
 st.set_page_config(
     page_title="دفتر ديوني",
     page_icon="📒",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
-
+ 
+ 
 # ---------- Database ----------
 @st.cache_resource
 def get_conn() -> sqlite3.Connection:
@@ -50,22 +50,22 @@ def get_conn() -> sqlite3.Connection:
     )
     conn.commit()
     return conn
-
-
+ 
+ 
 def now_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M")
-
-
+ 
+ 
 def query(sql: str, params: tuple = ()):
     return get_conn().execute(sql, params).fetchall()
-
-
+ 
+ 
 def execute(sql: str, params: tuple = ()):
     conn = get_conn()
     with conn:  # commit / rollback تلقائي
         conn.execute(sql, params)
-
-
+ 
+ 
 def get_customers(search: str = ""):
     search = search.strip()
     if search:
@@ -74,19 +74,19 @@ def get_customers(search: str = ""):
             (f"%{search}%",),
         )
     return query("SELECT * FROM customers ORDER BY name COLLATE NOCASE")
-
-
+ 
+ 
 def get_customer(customer_id):
     rows = query("SELECT * FROM customers WHERE id=?", (customer_id,))
     return rows[0] if rows else None
-
-
+ 
+ 
 def get_records(customer_id):
     return query(
         "SELECT * FROM records WHERE customer_id=? ORDER BY id DESC", (customer_id,)
     )
-
-
+ 
+ 
 def totals_by_customer():
     """ملخص كل العملاء باستعلام واحد بدل استعلام لكل عميل."""
     rows = query(
@@ -100,8 +100,8 @@ def totals_by_customer():
         s = entry["summary"].setdefault(r["currency"], {"debt": 0.0, "paid": 0.0})
         s["debt" if r["type"] == DEBT else "paid"] += float(r["total"])
     return result
-
-
+ 
+ 
 def summarize(records):
     summary = {c: {"debt": 0.0, "paid": 0.0, "remaining": 0.0} for c in CURRENCIES}
     for r in records:
@@ -111,27 +111,27 @@ def summarize(records):
     for s in summary.values():
         s["remaining"] = s["debt"] - s["paid"]
     return summary
-
-
+ 
+ 
 def add_customer(name: str):
     execute(
         "INSERT INTO customers(name, created_at) VALUES(?, ?)",
         (name.strip(), now_str()),
     )
-
-
+ 
+ 
 def add_record(customer_id, kind, amount, currency, note):
     execute(
         """INSERT INTO records(customer_id, type, amount, currency, note, created_at)
            VALUES(?, ?, ?, ?, ?, ?)""",
         (customer_id, kind, float(amount), currency, note.strip(), now_str()),
     )
-
-
+ 
+ 
 # ---------- Helpers ----------
 _AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩٫٬،", "0123456789.,,")
-
-
+ 
+ 
 def parse_amount(text: str) -> float:
     """يقبل الأرقام العربية والفاصلة؛ يرفع ValueError إن لم يكن المبلغ > 0."""
     cleaned = (text or "").strip().translate(_AR_DIGITS).replace(",", "")
@@ -139,17 +139,17 @@ def parse_amount(text: str) -> float:
     if value <= 0 or value != value or value == float("inf"):
         raise ValueError
     return round(value, 2)
-
-
+ 
+ 
 def money(value: float) -> str:
     text = f"{value:,.2f}"
     return text.rstrip("0").rstrip(".") if "." in text else text
-
-
+ 
+ 
 def clear_search():
     st.session_state["customer_search"] = ""
-
-
+ 
+ 
 # ---------- Styling ----------
 st.markdown(
     """
@@ -200,8 +200,8 @@ div[data-testid="stExpander"] {
 """,
     unsafe_allow_html=True,
 )
-
-
+ 
+ 
 def metric_card(label, value, accent="#2563eb", sub=""):
     sub_html = f'<div class="metric-sub">{sub}</div>' if sub else ""
     st.markdown(
@@ -212,12 +212,12 @@ def metric_card(label, value, accent="#2563eb", sub=""):
         </div>""",
         unsafe_allow_html=True,
     )
-
-
+ 
+ 
 def remaining_color(value):
     return "#dc2626" if value > 0 else "#059669"
-
-
+ 
+ 
 # ---------- Floating Calculator ----------
 # تُحقن مرة واحدة في صفحة Streamlit الأم، ويراقبها "حارس" (setInterval + MutationObserver)
 # يعيد إنشاء الزر فورًا لو اختفى بعد أي تنقّل أو إعادة رسم، فيظهر في كل الواجهات.
@@ -226,13 +226,13 @@ CALC_HTML = r"""
 (function () {
   var hostDoc = window.parent.document;
   if (hostDoc.getElementById("fcalc-script")) return;
-
+ 
   function boot() {
     var doc = document;
-
+ 
     function build() {
       if (doc.getElementById("fcalc-root")) return;
-
+ 
       if (!doc.getElementById("fcalc-style")) {
         var style = doc.createElement("style");
         style.id = "fcalc-style";
@@ -261,7 +261,7 @@ CALC_HTML = r"""
         `;
         doc.head.appendChild(style);
       }
-
+ 
       var root = doc.createElement("div");
       root.id = "fcalc-root";
       root.innerHTML =
@@ -271,11 +271,11 @@ CALC_HTML = r"""
         '  <div id="fcalc-grid"></div>' +
         '</div>';
       doc.body.appendChild(root);
-
+ 
       var box = doc.getElementById("fcalc-box");
       var display = doc.getElementById("fcalc-display");
       var grid = doc.getElementById("fcalc-grid");
-
+ 
       var keys = [
         ["C","مسح","clr"],["⌫","⌫",""],["/","÷","op"],
         ["7","7",""],["8","8",""],["9","9",""],["*","×","op"],
@@ -291,11 +291,11 @@ CALC_HTML = r"""
         if (k[2]) b.className = k[2];
         grid.appendChild(b);
       });
-
+ 
       doc.getElementById("fcalc-btn").addEventListener("click", function () {
         box.classList.toggle("open");
       });
-
+ 
       function calculate() {
         try {
           var expr = display.value;
@@ -305,7 +305,7 @@ CALC_HTML = r"""
           display.value = String(parseFloat(r.toFixed(10)));
         } catch (e) { display.value = "خطأ"; }
       }
-
+ 
       function press(k) {
         if (display.value === "خطأ") display.value = "";
         if (k === "C") display.value = "";
@@ -313,12 +313,12 @@ CALC_HTML = r"""
         else if (k === "=") calculate();
         else display.value += k;
       }
-
+ 
       grid.addEventListener("click", function (e) {
         var k = e.target.getAttribute("data-k");
         if (k) press(k);
       });
-
+ 
       // دعم لوحة المفاتيح عند فتح الحاسبة (بدون التعارض مع حقول الإدخال)
       doc.addEventListener("keydown", function (e) {
         if (!box.classList.contains("open")) return;
@@ -331,13 +331,13 @@ CALC_HTML = r"""
         else if (e.key === "Escape") box.classList.remove("open");
       });
     }
-
+ 
     build();
     // حارس: يعيد بناء الحاسبة إن حُذفت من الصفحة لأي سبب
     setInterval(build, 1000);
     new MutationObserver(build).observe(doc.body, { childList: true });
   }
-
+ 
   var s = hostDoc.createElement("script");
   s.id = "fcalc-script";
   s.textContent = "(" + boot.toString() + ")();";
@@ -345,12 +345,12 @@ CALC_HTML = r"""
 })();
 </script>
 """
-
-
+ 
+ 
 def floating_calculator():
     components.html(CALC_HTML, height=0)
-
-
+ 
+ 
 # ---------- Reusable UI ----------
 def record_form(form_key, title, kind, amount_label, currency_label, note_label,
                 button_label, success_msg, customer_id):
@@ -368,8 +368,8 @@ def record_form(form_key, title, kind, amount_label, currency_label, note_label,
                 else:
                     st.toast(success_msg, icon="✅")
                     st.rerun()
-
-
+ 
+ 
 def confirm_dialog(state_key, message, yes_label, yes_key, no_key, on_yes):
     if not st.session_state.get(state_key):
         return
@@ -382,12 +382,12 @@ def confirm_dialog(state_key, message, yes_label, yes_key, no_key, on_yes):
     if no.button("إلغاء", key=no_key):
         st.session_state.pop(state_key, None)
         st.rerun()
-
-
+ 
+ 
 # ---------- Header / navigation ----------
 st.session_state.setdefault("selected_customer_id", None)
 selected_id = st.session_state.selected_customer_id
-
+ 
 top_left, top_right = st.columns([9, 1])
 with top_left:
     st.markdown("# 📒 دفتر ديوني")
@@ -398,24 +398,24 @@ with top_right:
         with st.popover("🔎", use_container_width=True, help="بحث عن عميل"):
             st.text_input("ابحث عن عميل", placeholder="اكتب جزءًا من الاسم...",
                           key="customer_search")
-
+ 
 floating_calculator()  # تظهر في كل الواجهات
-
+ 
 # ---------- Customer details ----------
 if selected_id is not None:
     customer = get_customer(selected_id)
     if customer is None:
         st.session_state.selected_customer_id = None
         st.rerun()
-
+ 
     if st.button("⬅️ العودة إلى قائمة العملاء", key="back_customers"):
         st.session_state.selected_customer_id = None
         st.rerun()
-
+ 
     st.markdown(f"## 👤 سجل العميل: {customer['name']}")
     records = get_records(selected_id)
     summary = summarize(records)
-
+ 
     stat_cols = st.columns(6)
     with stat_cols[0]:
         metric_card("عدد العمليات", str(len(records)))
@@ -429,7 +429,7 @@ if selected_id is not None:
             metric_card(f"المتبقي — {cur}", money(s["remaining"]),
                         remaining_color(s["remaining"]),
                         f"دين {money(s['debt'])} · مسدد {money(s['paid'])}")
-
+ 
     st.markdown("---")
     add_col, pay_col = st.columns(2)
     with add_col:
@@ -439,7 +439,7 @@ if selected_id is not None:
         record_form("add_payment_form", "💵 تسجيل تسديد", PAYMENT, "مبلغ التسديد",
                     "عملة التسديد", "بيان التسديد", "حفظ التسديد",
                     "تم تسجيل التسديد.", selected_id)
-
+ 
     st.markdown("---")
     st.markdown("### 📋 سجل العمليات")
     if not records:
@@ -480,35 +480,35 @@ if selected_id is not None:
                 with b2:
                     if st.button("🗑️", key=f"delete_record_{rid}", help="حذف العملية"):
                         st.session_state[f"confirm_delete_record_{rid}"] = True
-
+ 
             confirm_dialog(
                 f"confirm_delete_record_{rid}",
                 "هل تريد حذف هذه العملية نهائيًا؟",
                 "نعم، احذف", f"yes_del_rec_{rid}", f"no_del_rec_{rid}",
                 lambda rid=rid: execute("DELETE FROM records WHERE id=?", (rid,)),
             )
-
+ 
     with st.expander("⚠️ حذف العميل بالكامل"):
         st.warning("سيتم حذف العميل وجميع سجلاته من قاعدة البيانات. لا يمكن التراجع عن هذا الإجراء.")
         if st.button("حذف العميل وسجلاته", type="primary", key="delete_customer"):
             st.session_state["confirm_delete_customer"] = True
-
+ 
         def _delete_customer():
             execute("DELETE FROM customers WHERE id=?", (selected_id,))  # CASCADE يحذف السجلات
             st.session_state.selected_customer_id = None
-
+ 
         confirm_dialog(
             "confirm_delete_customer",
             "تأكيد أخير: حذف العميل وكل سجلاته؟",
             "نعم، احذف العميل", "confirm_customer_delete", "cancel_customer_delete",
             _delete_customer,
         )
-
+ 
 # ---------- Main dashboard ----------
 else:
     customers = get_customers()
     totals = totals_by_customer()
-
+ 
     with st.expander("➕ إضافة عميل جديد", expanded=not customers):
         with st.form("new_customer_form", clear_on_submit=True):
             new_name = st.text_input("اسم العميل", placeholder="اكتب اسم العميل هنا")
@@ -523,12 +523,12 @@ else:
                     else:
                         st.toast("تمت إضافة العميل بنجاح.", icon="✅")
                         st.rerun()
-
+ 
     all_records = query("SELECT type, amount, currency FROM records")
     overall = summarize(all_records)
     debt_ops = sum(r["type"] == DEBT for r in all_records)
     pay_ops = len(all_records) - debt_ops
-
+ 
     g1, g2 = st.columns(2, gap="large")
     with g1:
         st.caption("📊 نظرة عامة")
@@ -547,16 +547,16 @@ else:
             with cols[i]:
                 metric_card(cur, money(s["remaining"]), remaining_color(s["remaining"]),
                             f"ديون {money(s['debt'])} · تسديدات {money(s['paid'])}")
-
+ 
     st.markdown("---")
     st.markdown("### 👥 العملاء")
-
+ 
     search = st.session_state.get("customer_search", "")
     if search.strip():
         info_col, clear_col = st.columns([5, 1])
         info_col.caption(f"نتائج البحث عن: «{search.strip()}»")
         clear_col.button("✖ إلغاء البحث", on_click=clear_search, use_container_width=True)
-
+ 
     shown = get_customers(search)
     if not shown:
         st.info("لا يوجد عملاء مطابقون. أضف عميلًا جديدًا من الأعلى.")
@@ -579,6 +579,7 @@ else:
                              use_container_width=True):
                     st.session_state.selected_customer_id = customer["id"]
                     st.rerun()
-
+ 
     st.caption("تُحفظ البيانات محليًا في ملف SQLite بجانب ملف البرنامج. "
                "خذ نسخة احتياطية من ملف daftar_deyoon.db بشكل دوري.")
+ 
