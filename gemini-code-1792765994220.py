@@ -3,13 +3,6 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 
-# Optional dependency for a true floating widget in Streamlit
-try:
-    from streamlit_float import float_init, float_parent
-    FLOAT_AVAILABLE = True
-except ImportError:
-    FLOAT_AVAILABLE = False
-
 APP_DIR = Path(__file__).resolve().parent
 DB_PATH = APP_DIR / "daftar_deyoon.db"
 
@@ -82,12 +75,12 @@ div.stButton > button:hover, div.stFormSubmitButton > button:hover {
     background: white;
     border: 1px solid #e5eaf3;
     border-radius: 18px;
-    padding: 18px 16px;
-    box-shadow: 0 6px 20px rgba(25, 45, 85, .055);
-    min-height: 112px;
+    padding: 14px 12px;
+    box-shadow: 0 4px 15px rgba(25, 45, 85, .04);
+    min-height: 90px;
 }
-.metric-label { color: #64748b; font-size: .92rem; font-weight: 600; }
-.metric-value { color: #14213d; font-size: 1.55rem; font-weight: 800; margin-top: 7px; }
+.metric-label { color: #64748b; font-size: .85rem; font-weight: 600; }
+.metric-value { color: #14213d; font-size: 1.35rem; font-weight: 800; margin-top: 4px; }
 .panel {
     background: white;
     border: 1px solid #e5eaf3;
@@ -95,14 +88,6 @@ div.stButton > button:hover, div.stFormSubmitButton > button:hover {
     padding: 18px;
     box-shadow: 0 6px 20px rgba(25, 45, 85, .04);
 }
-.customer-card {
-    background: white;
-    border: 1px solid #e5eaf3;
-    border-radius: 16px;
-    padding: 15px 17px;
-    margin-bottom: 10px;
-}
-.small-muted { color: #64748b; font-size: .88rem; }
 div[data-testid="stExpander"] {
     background: rgba(255,255,255,.82);
     border: 1px solid #e5eaf3;
@@ -169,77 +154,110 @@ def add_record(customer_id, kind, amount, currency, note):
              datetime.now().strftime("%Y-%m-%d %H:%M"))
         )
 
-# ---------- Floating calculator ----------
+# ---------- Floating Bubble Calculator (Works everywhere) ----------
 def floating_calculator():
-    # streamlit-float places this panel above the page. If the optional package
-    # is not installed, show a reliable calculator in an expander instead.
-    if FLOAT_AVAILABLE:
-        try:
-            float_init()
-            with st.container():
-                st.markdown("### 🧮 الحاسبة")
-                open_calc = st.toggle("إظهار الحاسبة", key="show_float_calc", value=False)
-                if open_calc:
-                    st.components.v1.html("""
-                    <div dir="ltr" style="font-family:Arial;background:#172033;color:white;
-                         padding:12px;border-radius:14px;">
-                      <input id="calc-display" readonly value=""
-                        style="box-sizing:border-box;width:100%;height:42px;border:0;border-radius:8px;
-                        background:#0b1220;color:#67e8f9;text-align:right;font-size:22px;padding:7px;margin-bottom:8px">
-                      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px">
-                        <button onclick="add('7')">7</button><button onclick="add('8')">8</button>
-                        <button onclick="add('9')">9</button><button onclick="add('/')">÷</button>
-                        <button onclick="add('4')">4</button><button onclick="add('5')">5</button>
-                        <button onclick="add('6')">6</button><button onclick="add('*')">×</button>
-                        <button onclick="add('1')">1</button><button onclick="add('2')">2</button>
-                        <button onclick="add('3')">3</button><button onclick="add('-')">−</button>
-                        <button onclick="add('0')">0</button><button onclick="add('.')">.</button>
-                        <button onclick="calc()">=</button><button onclick="add('+')">+</button>
-                        <button onclick="clr()" style="grid-column:span 4;background:#dc2626;color:white">مسح C</button>
-                      </div>
-                    </div>
-                    <script>
-                    const d=document.getElementById('calc-display');
-                    function add(v){d.value+=v}
-                    function clr(){d.value=''}
-                    function calc(){
-                      try {
-                        if(!/^[0-9+\\-*/.() ]+$/.test(d.value)) throw 0;
-                        d.value=Function('"use strict";return ('+d.value+')')();
-                      } catch(e){d.value='خطأ'}
-                    }
-                    document.querySelectorAll('button').forEach(b=>{
-                      b.style.cssText='border:0;border-radius:7px;padding:9px;background:#334155;color:white;font-size:16px;cursor:pointer';
-                    });
-                    </script>
-                    """, height=260, scrolling=False)
-            float_parent(css="""
-                position: fixed; bottom: 18px; left: 18px; z-index: 999999;
-                width: 250px; background: white; border: 1px solid #dbe4f0;
-                border-radius: 16px; padding: 10px; box-shadow: 0 10px 35px rgba(15,23,42,.22);
-            """)
-            return
-        except Exception:
-            pass
+    st.markdown("""
+    <style>
+    .floating-calc-btn {
+        position: fixed;
+        bottom: 25px;
+        left: 25px;
+        z-index: 999999;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 55px;
+        height: 55px;
+        font-size: 24px;
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+    }
+    .floating-calc-btn:hover {
+        transform: scale(1.1);
+    }
+    .floating-calc-box {
+        position: fixed;
+        bottom: 95px;
+        left: 25px;
+        z-index: 999999;
+        width: 280px;
+        background: #172033;
+        color: white;
+        padding: 15px;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        display: none;
+    }
+    .floating-calc-box input {
+        box-sizing: border-box;
+        width: 100%;
+        height: 45px;
+        border: 0;
+        border-radius: 8px;
+        background: #0b1220;
+        color: #67e8f9;
+        text-align: right;
+        font-size: 22px;
+        padding: 7px;
+        margin-bottom: 10px;
+    }
+    .floating-calc-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+    }
+    .floating-calc-grid button {
+        border: 0;
+        border-radius: 8px;
+        padding: 10px;
+        background: #334155;
+        color: white;
+        font-size: 16px;
+        cursor: pointer;
+    }
+    .floating-calc-grid button:hover {
+        background: #475569;
+    }
+    </style>
 
-    with st.expander("🧮 الحاسبة", expanded=False):
-        st.caption("نسخة بديلة داخل الصفحة. لتفعيل الفقاعة العائمة ثبّت streamlit-float.")
-        if "calc_expr" not in st.session_state:
-            st.session_state.calc_expr = ""
-        st.text_input("العملية الحسابية", key="calc_expr", placeholder="مثال: 120+35*2")
-        cc1, cc2 = st.columns(2)
-        if cc1.button("احسب", key="calc_eval"):
-            try:
-                expr = st.session_state.calc_expr.strip()
-                if not expr or any(ch not in "0123456789+-*/(). " for ch in expr):
-                    raise ValueError
-                result = eval(expr, {"__builtins__": {}}, {})
-                st.success(f"الناتج: {money(float(result))}")
-            except Exception:
-                st.error("تحقق من العملية الحسابية.")
-        if cc2.button("مسح", key="calc_clear"):
-            st.session_state.calc_expr = ""
-            st.rerun()
+    <button class="floating-calc-btn" onclick="toggleCalc()" title="الحاسبة العائمة">🧮</button>
+
+    <div class="floating-calc-box" id="floatingCalcBox" dir="ltr">
+      <input id="calc-display" readonly value="">
+      <div class="floating-calc-grid">
+        <button onclick="add('7')">7</button><button onclick="add('8')">8</button>
+        <button onclick="add('9')">9</button><button onclick="add('/')">÷</button>
+        <button onclick="add('4')">4</button><button onclick="add('5')">5</button>
+        <button onclick="add('6')">6</button><button onclick="add('*')">×</button>
+        <button onclick="add('1')">1</button><button onclick="add('2')">2</button>
+        <button onclick="add('3')">3</button><button onclick="add('-')">−</button>
+        <button onclick="add('0')">0</button><button onclick="add('.')">.</button>
+        <button onclick="calc()">=</button><button onclick="add('+')">+</button>
+        <button onclick="clr()" style="grid-column:span 4;background:#dc2626;color:white">مسح C</button>
+      </div>
+    </div>
+
+    <script>
+    function toggleCalc() {
+        const box = document.getElementById('floatingCalcBox');
+        box.style.display = box.style.display === 'block' ? 'none' : 'block';
+    }
+    const d = document.getElementById('calc-display');
+    function add(v) { d.value += v; }
+    function clr() { d.value = ''; }
+    function calc() {
+      try {
+        if(!/^[0-9+\\-*/.() ]+$/.test(d.value)) throw 0;
+        d.value = Function('"use strict";return (' + d.value + ')')();
+      } catch(e) { d.value = 'خطأ'; }
+    }
+    </script>
+    """, unsafe_allow_html=True)
 
 # ---------- Header / navigation ----------
 if "selected_customer_id" not in st.session_state:
@@ -252,6 +270,7 @@ with top_left:
 with top_right:
     st.markdown("<div style='text-align:left;padding-top:15px;color:#64748b'>نسخة مطوّرة</div>", unsafe_allow_html=True)
 
+# تشغيل فقاعة الحاسبة العائمة في كل مكان
 floating_calculator()
 
 selected_id = st.session_state.selected_customer_id
@@ -274,8 +293,8 @@ if selected_id is not None:
     metric_cols = st.columns(3)
     total_records = len(records)
     metric_cols[0].metric("عدد العمليات", total_records)
-    metric_cols[1].metric("إجمالي الديون (كل عملة منفصلة)", sum(1 for r in records if r["type"] == "دين"))
-    metric_cols[2].metric("إجمالي التسديدات (عمليات)", sum(1 for r in records if r["type"] == "تسديد"))
+    metric_cols[1].metric("الديون", sum(1 for r in records if r["type"] == "دين"))
+    metric_cols[2].metric("التسديدات", sum(1 for r in records if r["type"] == "تسديد"))
 
     st.markdown("### 💱 الرصيد حسب العملة")
     cols = st.columns(3)
@@ -290,29 +309,35 @@ if selected_id is not None:
     with add_col:
         with st.form("add_debt_form", clear_on_submit=True):
             st.subheader("➕ إضافة دين")
-            d_amount = st.number_input("المبلغ", min_value=0.0, value=None, step=1.0, format="%.2f", placeholder="اكتب المبلغ مثل 250 أو 250.75", key="debt_amount")
+            d_amount_str = st.text_input("المبلغ", placeholder="اكتب المبلغ مثل 250 أو 250.75", key="debt_amount_str")
             d_currency = st.selectbox("العملة", CURRENCIES, key="debt_currency")
             d_note = st.text_input("البيان / الملاحظة", key="debt_note")
             if st.form_submit_button("حفظ الدين", use_container_width=True):
-                if d_amount is None or d_amount <= 0:
-                    st.error("أدخل مبلغًا أكبر من صفر.")
-                else:
+                try:
+                    d_amount = float(d_amount_str.strip())
+                    if d_amount <= 0:
+                        raise ValueError
                     add_record(selected_id, "دين", d_amount, d_currency, d_note)
                     st.success("تم حفظ الدين.")
                     st.rerun()
+                except ValueError:
+                    st.error("الرجاء إدخال مبلغ صحيح أكبر من صفر.")
     with pay_col:
         with st.form("add_payment_form", clear_on_submit=True):
             st.subheader("💵 تسجيل تسديد")
-            p_amount = st.number_input("مبلغ التسديد", min_value=0.0, value=None, step=1.0, format="%.2f", placeholder="اكتب المبلغ مثل 250 أو 250.75", key="pay_amount")
+            p_amount_str = st.text_input("مبلغ التسديد", placeholder="اكتب المبلغ مثل 250 أو 250.75", key="pay_amount_str")
             p_currency = st.selectbox("عملة التسديد", CURRENCIES, key="pay_currency")
             p_note = st.text_input("بيان التسديد", key="pay_note")
             if st.form_submit_button("حفظ التسديد", use_container_width=True):
-                if p_amount is None or p_amount <= 0:
-                    st.error("أدخل مبلغًا أكبر من صفر.")
-                else:
+                try:
+                    p_amount = float(p_amount_str.strip())
+                    if p_amount <= 0:
+                        raise ValueError
                     add_record(selected_id, "تسديد", p_amount, p_currency, p_note)
                     st.success("تم تسجيل التسديد.")
                     st.rerun()
+                except ValueError:
+                    st.error("الرجاء إدخال مبلغ صحيح أكبر من صفر.")
 
     st.markdown("---")
     st.markdown("### 📋 سجل العمليات")
@@ -321,32 +346,39 @@ if selected_id is not None:
     else:
         for rec in records:
             is_payment = rec["type"] == "تسديد"
-            title_color = "#059669" if is_payment else "#dc2626"
             with st.container(border=True):
                 left, right = st.columns([4, 1])
                 with left:
                     st.markdown(f"**:{'green' if is_payment else 'red'}[{rec['type']}]** · **{money(rec['amount'])} {rec['currency']}**")
                     st.caption(f"{rec['created_at']}  ·  {rec['note'] or 'بدون ملاحظة'}")
                 with right:
-                    with st.popover("✏️ تعديل"):
-                        with st.form(f"edit_record_{rec['id']}"):
-                            edit_type = st.selectbox("نوع العملية", ["دين", "تسديد"],
-                                index=0 if rec["type"] == "دين" else 1, key=f"etype_{rec['id']}")
-                            edit_amount = st.number_input("المبلغ", min_value=0.0,
-                                value=float(rec["amount"]), step=10.0, format="%.2f", key=f"eamount_{rec['id']}")
-                            edit_currency = st.selectbox("العملة", CURRENCIES,
-                                index=CURRENCIES.index(rec["currency"]) if rec["currency"] in CURRENCIES else 0,
-                                key=f"ecurr_{rec['id']}")
-                            edit_note = st.text_input("الملاحظة", value=rec["note"] or "", key=f"enote_{rec['id']}")
-                            if st.form_submit_button("حفظ التعديل"):
-                                with get_conn() as conn:
-                                    conn.execute("""UPDATE records SET type=?, amount=?, currency=?, note=?
-                                                    WHERE id=? AND customer_id=?""",
-                                        (edit_type, float(edit_amount), edit_currency, edit_note, rec["id"], selected_id))
-                                st.success("تم تعديل العملية.")
-                                st.rerun()
-                    if st.button("🗑️ حذف", key=f"delete_record_{rec['id']}"):
-                        st.session_state[f"confirm_delete_record_{rec['id']}"] = True
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        with st.popover("✏️"):
+                            with st.form(f"edit_record_{rec['id']}"):
+                                edit_type = st.selectbox("نوع العملية", ["دين", "تسديد"],
+                                    index=0 if rec["type"] == "دين" else 1, key=f"etype_{rec['id']}")
+                                edit_amount_str = st.text_input("المبلغ",
+                                    value=str(rec["amount"]), key=f"eamount_{rec['id']}")
+                                edit_currency = st.selectbox("العملة", CURRENCIES,
+                                    index=CURRENCIES.index(rec["currency"]) if rec["currency"] in CURRENCIES else 0,
+                                    key=f"ecurr_{rec['id']}")
+                                edit_note = st.text_input("الملاحظة", value=rec["note"] or "", key=f"enote_{rec['id']}")
+                                if st.form_submit_button("حفظ التعديل"):
+                                    try:
+                                        edit_amount = float(edit_amount_str.strip())
+                                        with get_conn() as conn:
+                                            conn.execute("""UPDATE records SET type=?, amount=?, currency=?, note=?
+                                                            WHERE id=? AND customer_id=?""",
+                                                (edit_type, edit_amount, edit_currency, edit_note, rec["id"], selected_id))
+                                        st.success("تم تعديل العملية.")
+                                        st.rerun()
+                                    except ValueError:
+                                        st.error("مبلغ غير صحيح.")
+                    with btn_col2:
+                        if st.button("🗑️", key=f"delete_record_{rec['id']}", help="حذف العملية"):
+                            st.session_state[f"confirm_delete_record_{rec['id']}"] = True
+
                 if st.session_state.get(f"confirm_delete_record_{rec['id']}", False):
                     st.warning("هل تريد حذف هذه العملية نهائيًا؟")
                     yes, no = st.columns(2)
@@ -387,6 +419,7 @@ else:
     st.markdown("### 📊 نظرة عامة")
     total_debt_count = sum(1 for r in all_records if r["type"] == "دين")
     total_payment_count = sum(1 for r in all_records if r["type"] == "تسديد")
+    
     overview_cols = st.columns(3)
     with overview_cols[0]:
         metric_card("عدد العملاء", str(len(customers)), "#2563eb")
@@ -444,4 +477,3 @@ else:
                         st.rerun()
 
     st.caption("تُحفظ البيانات محليًا في ملف SQLite بجانب ملف البرنامج. خذ نسخة احتياطية من ملف daftar_deyoon.db بشكل دوري.")
-
