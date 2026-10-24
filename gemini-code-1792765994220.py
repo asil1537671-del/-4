@@ -20,6 +20,8 @@ def get_conn():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 def init_db():
@@ -115,6 +117,17 @@ div[data-testid="stExpander"] {
 [data-testid="stDialog"] > div {
     border-radius: 24px !important;
 }
+/* Fix calculator component to the screen rather than leaving it in page flow. */
+iframe[title="streamlit.components.v1.html"] {
+    position: fixed !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 320px !important;
+    height: 470px !important;
+    z-index: 999999 !important;
+    border: 0 !important;
+    background: transparent !important;
+}
 hr { border-color: #e7ecef; }
 .small-muted { color: #8b95a7; font-size: .85rem; }
 </style>
@@ -199,6 +212,7 @@ CALC_HTML = r"""
 </div>
 <style>
 #calc-app { font-family: Arial,sans-serif; }
+html, body { margin:0; padding:0; background:transparent; overflow:visible; }
 #calc-toggle {
  position:fixed; bottom:24px; left:22px; z-index:99999; width:58px;height:58px;
  border:0;border-radius:20px;background:linear-gradient(135deg,#18b7a3,#098b80);color:#fff;
@@ -223,33 +237,78 @@ CALC_HTML = r"""
 </style>
 <script>
 (function(){
- const panel=document.getElementById('calc-panel'), toggle=document.getElementById('calc-toggle');
- const screen=document.getElementById('calc-screen'), close=document.getElementById('calc-close');
- if(!panel || panel.dataset.ready) return; panel.dataset.ready='1';
- let expr='';
- toggle.addEventListener('click',()=>panel.classList.toggle('open'));
- close.addEventListener('click',()=>panel.classList.remove('open'));
- panel.querySelector('.calc-grid').addEventListener('click',e=>{
-   const key=e.target.getAttribute('data-key'); if(!key)return;
-   if(key==='clear'){expr='';screen.value='0';return;}
-   if(key==='='){
-     if(!expr)return;
-     if(!/^[0-9+*/(). -]+$/.test(expr)){screen.value='خطأ';expr='';return;}
-     try { const result=Function('"use strict";return ('+expr+')')();
-       if(typeof result!=='number'||!Number.isFinite(result))throw Error();
-       expr=String(Number(result.toFixed(8)));screen.value=expr;
-     } catch(err){screen.value='خطأ';expr='';}
-     return;
-   }
-   if(screen.value==='خطأ'){expr='';}
-   expr+=key;screen.value=expr;
- });
+  const panel=document.getElementById('calc-panel');
+  const toggle=document.getElementById('calc-toggle');
+  const screen=document.getElementById('calc-screen');
+  const close=document.getElementById('calc-close');
+  if(!panel || panel.dataset.ready) return;
+  panel.dataset.ready='1';
+  let expr='';
+
+  toggle.addEventListener('click',()=>panel.classList.toggle('open'));
+  close.addEventListener('click',()=>panel.classList.remove('open'));
+
+  function calculate(source) {
+    const compact=source.replace(/\s+/g,'');
+    const tokens=compact.match(/(?:\d+\.?\d*|\.\d+)|[()+\-*/]/g);
+    if(!tokens || tokens.join('')!==compact) throw Error('invalid');
+    let i=0;
+    function expression() {
+      let value=term();
+      while(tokens[i]==='+' || tokens[i]==='-') {
+        const op=tokens[i++], rhs=term();
+        value=op==='+' ? value+rhs : value-rhs;
+      }
+      return value;
+    }
+    function term() {
+      let value=factor();
+      while(tokens[i]==='*' || tokens[i]==='/') {
+        const op=tokens[i++], rhs=factor();
+        if(op==='/' && rhs===0) throw Error('zero');
+        value=op==='*' ? value*rhs : value/rhs;
+      }
+      return value;
+    }
+    function factor() {
+      if(tokens[i]==='+'){i++;return factor();}
+      if(tokens[i]==='-'){i++;return -factor();}
+      if(tokens[i]==='(') {
+        i++; const value=expression();
+        if(tokens[i++]!==')') throw Error('paren');
+        return value;
+      }
+      const token=tokens[i++];
+      if(token===undefined || !/^(?:\d+\.?\d*|\.\d+)$/.test(token)) throw Error('number');
+      return Number(token);
+    }
+    const result=expression();
+    if(i!==tokens.length || !Number.isFinite(result)) throw Error('invalid');
+    return Number(result.toFixed(8)).toString();
+  }
+
+  panel.querySelector('.calc-grid').addEventListener('click',e=>{
+    const button=e.target.closest('button[data-key]');
+    if(!button)return;
+    const key=button.getAttribute('data-key');
+    if(key==='clear'){expr='';screen.value='0';return;}
+    if(key==='back'){expr=expr.slice(0,-1);screen.value=expr||'0';return;}
+    if(key==='='){
+      if(!expr)return;
+      try { expr=calculate(expr); screen.value=expr; }
+      catch(err){screen.value='خطأ في العملية';expr='';}
+      return;
+    }
+    if(screen.value.startsWith('خطأ')) {expr='';screen.value='0';}
+    if(expr.length>=100)return;
+    expr+=key;screen.value=expr;
+  });
 })();
 </script>
 """
 def floating_calculator():
-    # The calculator runs in a small component frame, with its own fixed floating controls.
-    components.html(CALC_HTML, height=90, scrolling=False)
+    # The parent-page CSS fixes this iframe to the lower-left corner of the screen.
+    components.html(CALC_HTML, height=470, width=320, scrolling=False)
 
 # ---------- Session state ----------
 if "selected_customer_id" not in st.session_state:
