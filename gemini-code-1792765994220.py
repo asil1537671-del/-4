@@ -47,7 +47,7 @@ init_db()
 
 CURRENCIES = ["IQD", "ريال يمني", "ريال سعودي", "دولار أمريكي"]
 
-# ---------- Styling (Matching the exact design theme) ----------
+# ---------- Styling ----------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
@@ -61,37 +61,7 @@ html, body, [class*="css"], [data-testid="stAppViewContainer"] {
 [data-testid="stHeader"] { background: rgba(0,0,0,0); }
 .block-container { padding-top: 1rem; padding-bottom: 5rem; max-width: 600px; }
 
-/* بطاقة العضوية الخضراء */
-.sub-card {
-    background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
-    border-radius: 20px;
-    padding: 20px;
-    color: white;
-    box-shadow: 0 10px 25px rgba(13, 148, 136, 0.2);
-    margin-bottom: 15px;
-}
-.sub-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.sub-badge { background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
-.sub-name { font-size: 1.4rem; font-weight: 800; }
-.sub-email { font-size: 0.85rem; opacity: 0.9; margin-bottom: 15px; }
-.sub-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 12px; font-size: 0.8rem; opacity: 0.95; }
-
-/* بطاقة الترحيب والتحصيلات */
-.welcome-card {
-    background: white;
-    border-radius: 16px;
-    padding: 15px 20px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-    margin-bottom: 15px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.welcome-text { font-weight: 700; color: #1e293b; font-size: 1rem; }
-.collection-tag { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; }
-
-/* قسم الإحصائيات */
+/* بطاقات الإحصائيات المطابقة للصورة */
 .stat-box-red {
     background: #fff5f5;
     border: 1px solid #fed7d7;
@@ -99,6 +69,7 @@ html, body, [class*="css"], [data-testid="stAppViewContainer"] {
     padding: 15px;
     text-align: center;
     margin-bottom: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
 }
 .stat-box-green {
     background: #f0fdf4;
@@ -107,9 +78,10 @@ html, body, [class*="css"], [data-testid="stAppViewContainer"] {
     padding: 15px;
     text-align: center;
     margin-bottom: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
 }
-.stat-title { font-size: 0.85rem; font-weight: 700; color: #64748b; margin-bottom: 5px; }
-.stat-val { font-size: 1.2rem; font-weight: 800; color: #1e293b; }
+.stat-title { font-size: 0.9rem; font-weight: 700; color: #475569; margin-bottom: 6px; }
+.stat-val { font-size: 1.25rem; font-weight: 800; color: #1e293b; }
 
 div.stButton > button {
     border-radius: 12px;
@@ -162,85 +134,6 @@ def add_record(customer_id, kind, amount, currency, note):
 def clear_search():
     st.session_state["customer_search"] = ""
 
-# ---------- Floating Calculator ----------
-CALC_HTML = r"""
-<script>
-(function () {
-  var host = window.parent;
-  var hostDoc = host.document;
-  if (hostDoc.getElementById("fcalc-script")) return;
-
-  function init() {
-    if (document.getElementById("fcalc-root")) return;
-    var style = document.createElement("style");
-    style.id = "fcalc-style";
-    style.textContent = `
-      #fcalc-btn {
-        position: fixed; bottom: 25px; left: 25px; z-index: 999999;
-        width: 55px; height: 55px; border: none; border-radius: 50%;
-        background: #0d9488; color: #fff; font-size: 24px; cursor: pointer;
-        box-shadow: 0 4px 20px rgba(13,148,136,.4);
-        display: flex; align-items: center; justify-content: center;
-      }
-      #fcalc-box {
-        position: fixed; bottom: 95px; left: 25px; z-index: 999999;
-        width: 280px; padding: 15px; border-radius: 16px;
-        background: #172033; color: #fff; display: none;
-        box-shadow: 0 10px 30px rgba(0,0,0,.4);
-      }
-      #fcalc-box.open { display: block; }
-      #fcalc-display {
-        width: 100%; height: 45px; border: 0; border-radius: 8px;
-        background: #0b1220; color: #67e8f9; text-align: right;
-        font-size: 22px; padding: 7px; margin-bottom: 10px; direction: ltr;
-      }
-      #fcalc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-      #fcalc-grid button, #fcalc-clear {
-        border: 0; border-radius: 8px; padding: 10px; background: #334155;
-        color: #fff; font-size: 16px; cursor: pointer;
-      }
-      #fcalc-clear { grid-column: span 4; background: #dc2626; }
-    `;
-    document.head.appendChild(style);
-
-    var root = document.createElement("div");
-    root.id = "fcalc-root";
-    root.innerHTML = '<button id="fcalc-btn" type="button">🧮</button><div id="fcalc-box" dir="ltr"><input id="fcalc-display" readonly><div id="fcalc-grid"></div></div>';
-    document.body.appendChild(root);
-
-    var box = document.getElementById("fcalc-box");
-    var btn = document.getElementById("fcalc-btn");
-    var display = document.getElementById("fcalc-display");
-    var grid = document.getElementById("fcalc-grid");
-
-    ["7","8","9","/","4","5","6","*","1","2","3","-","0",".","=","+"].forEach(function (k) {
-      var b = document.createElement("button");
-      b.type = "button"; b.textContent = k; b.setAttribute("data-k", k);
-      grid.appendChild(b);
-    });
-    var clr = document.createElement("button"); clr.type = "button"; clr.id = "fcalc-clear"; clr.textContent = "مسح C";
-    grid.appendChild(clr);
-
-    btn.addEventListener("click", function () { box.classList.toggle("open"); });
-    grid.addEventListener("click", function (e) {
-      var t = e.target;
-      if (t.id === "fcalc-clear") { display.value = ""; return; }
-      var k = t.getAttribute("data-k");
-      if (!k) return;
-      if (k === "=") {
-        try { display.value = String(eval(display.value)); } catch(e) { display.value = "خطأ"; }
-      } else { display.value += k; }
-    });
-  }
-  var s = hostDoc.createElement("script");
-  s.id = "fcalc-script";
-  s.textContent = "(" + init.toString() + ")();";
-  hostDoc.body.appendChild(s);
-})();
-</script>
-"""
-components.html(CALC_HTML, height=0)
-
 if "selected_customer_id" not in st.session_state:
     st.session_state.selected_customer_id = None
 
@@ -279,7 +172,7 @@ if selected_id is not None:
         with st.form("add_pay_form", clear_on_submit=True):
             st.subheader("💵 تسجيل تسديد")
             p_amount_str = st.text_input("مبلغ التسديد", placeholder="اكتب المبلغ", key="p_amt")
-            p_currency = st.selectbox("العملة", CURRENCIES, key="p_curr")
+            p_currency = st.selectbox("عملة التسديد", CURRENCIES, key="p_curr")
             p_note = st.text_input("البيان", key="p_note")
             if st.form_submit_button("حفظ التسديد", use_container_width=True):
                 try:
@@ -301,31 +194,58 @@ else:
     # 1. شريط البحث العلوي
     st.text_input("بحث شامل...", placeholder="🔍 ابحث عن عميل...", key="customer_search")
 
-    # 2. بطاقة العضوية الخضراء تماماً مثل الصورة
-    st.markdown("""
-        <div class="sub-card">
-            <div class="sub-header">
-                <span class="sub-name">اصيل الحبيشي</span>
-                <span class="sub-badge">قريب الانتهاء 🟠</span>
-            </div>
-            <div class="sub-email">asil1537671@gmail.com</div>
-            <div style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 4px;">باقة النسخة الكاملة</div>
-            <div class="sub-footer">
-                <span>الأيام المتبقية: 17 يوم</span>
-                <span>تاريخ الانتهاء: 2026/11/10</span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    # 2. الآلة الحاسبة بالتصميم المطابق تماماً للصورة المطلوبة
+    CALC_HTML = r"""
+    <div style="background: #172033; border-radius: 16px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);" dir="ltr">
+      <div style="color: #fff; text-align: center; font-weight: 700; margin-bottom: 10px; font-size: 0.95rem; font-family: 'Cairo', sans-serif;">الآلة الحاسبة</div>
+      <input id="calc-display" readonly style="width: 100%; height: 45px; border: 0; border-radius: 8px; background: #0b1220; color: #67e8f9; text-align: right; font-size: 22px; padding: 7px; margin-bottom: 10px; box-sizing: border-box;" value="">
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+        <button class="c-btn" onclick="press('7')">7</button>
+        <button class="c-btn" onclick="press('8')">8</button>
+        <button class="c-btn" onclick="press('9')">9</button>
+        <button class="c-btn" onclick="press('/')" style="background:#334155;">/</button>
+        <button class="c-btn" onclick="press('4')">4</button>
+        <button class="c-btn" onclick="press('5')">5</button>
+        <button class="c-btn" onclick="press('6')">6</button>
+        <button class="c-btn" onclick="press('*')" style="background:#334155;">*</button>
+        <button class="c-btn" onclick="press('1')">1</button>
+        <button class="c-btn" onclick="press('2')">2</button>
+        <button class="c-btn" onclick="press('3')">3</button>
+        <button class="c-btn" onclick="press('-')" style="background:#334155;">-</button>
+        <button class="c-btn" onclick="press('0')">0</button>
+        <button class="c-btn" onclick="clearOne()" style="background:#dc2626;">C</button>
+        <button class="c-btn" onclick="calc()" style="background:#059669;">=</button>
+        <button class="c-btn" onclick="press('+')" style="background:#334155;">+</button>
+      </div>
+    </div>
+    <script>
+      function press(v) {
+        var d = document.getElementById('calc-display');
+        if(d.value === 'خطأ') d.value = '';
+        d.value += v;
+      }
+      function clearOne() {
+        var d = document.getElementById('calc-display');
+        d.value = '';
+      }
+      function calc() {
+        var d = document.getElementById('calc-display');
+        try {
+          var res = Function('"use strict";return (' + d.value + ')')();
+          d.value = String(parseFloat(res.toFixed(10)));
+        } catch(e) {
+          d.value = 'خطأ';
+        }
+      }
+    </script>
+    <style>
+      .c-btn { border: 0; border-radius: 8px; padding: 12px 0; background: #334155; color: #fff; font-size: 16px; cursor: pointer; font-weight: 700; text-align: center; }
+      .c-btn:hover { background: #475569; }
+    </style>
+    """
+    components.html(CALC_HTML, height=270)
 
-    # 3. بطاقة التحصيلات اليومية والترحيب
-    st.markdown("""
-        <div class="welcome-card">
-            <div class="welcome-text">مساء الخير, اصيل الحبيشي 👋</div>
-            <div class="collection-tag">✔ تحصيلات اليوم: 1,000 IQD</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # 4. قسم الإحصائيات (4 مربعات تماماً كالصورة)
+    # 3. حساب الإحصائيات
     customers = get_customers()
     all_records = []
     for c in customers:
@@ -338,7 +258,8 @@ else:
     total_paid_amount = sum(r["amount"] for r in all_records if r["type"] == "تسديد")
     net_amount = total_debt_amount - total_paid_amount
 
-    st.markdown("<div style='font-weight:700; margin-bottom:8px; color:#1e293b;'>📊 ملخص الاحصائيات</div>", unsafe_allow_html=True)
+    # 4. قسم ملخص الإحصائيات والمربعات الأربعة بتنسيق الألوان المطلوب
+    st.markdown("<div style='font-weight:700; margin-bottom:10px; color:#1e293b; font-size:1.05rem;'>📊 ملخص الاحصائيات</div>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -387,7 +308,7 @@ else:
                     except:
                         st.error("الاسم موجود مسبقاً")
 
-    # 6. قائمة العملاء والبحث
+    # 6. قائمة العملاء
     st.markdown("### 👥 قائمة العملاء")
     search = st.session_state.get("customer_search", "")
     if search.strip():
@@ -400,11 +321,4 @@ else:
         st.info("لا يوجد عملاء حالياً.")
     else:
         for customer in shown_customers:
-            with st.container(border=True):
-                c_name, c_btn = st.columns([3, 1])
-                with c_name:
-                    st.markdown(f"**👤 {customer['name']}**")
-                with c_btn:
-                    if st.button("فتح السجل", key=f"cust_{customer['id']}", use_container_width=True):
-                        st.session_state.selected_customer_id = customer["id"]
-                        st.rerun()
+            with st.container
