@@ -61,7 +61,6 @@ html, body, [class*="css"], [data-testid="stAppViewContainer"] {
 [data-testid="stHeader"] { background: rgba(0,0,0,0); }
 .block-container { padding-top: 1rem; padding-bottom: 5rem; max-width: 600px; }
 
-/* بطاقات الإحصائيات المطابقة للصورة */
 .stat-box-red {
     background: #fff5f5;
     border: 1px solid #fed7d7;
@@ -185,16 +184,14 @@ if selected_id is not None:
 
     st.markdown("### 📋 العمليات المسجلة")
     for rec in records:
-        with st.container(border=True):
+        with st.container():
             st.markdown(f"**{rec['type']}** · **{money(rec['amount'])} {rec['currency']}**")
             st.caption(f"{rec['created_at']} | {rec['note'] or 'بدون ملاحظة'}")
 
 # ---------- Main Dashboard View ----------
 else:
-    # 1. شريط البحث العلوي
     st.text_input("بحث شامل...", placeholder="🔍 ابحث عن عميل...", key="customer_search")
 
-    # 2. الآلة الحاسبة بالتصميم المطابق تماماً للصورة المطلوبة
     CALC_HTML = r"""
     <div style="background: #172033; border-radius: 16px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);" dir="ltr">
       <div style="color: #fff; text-align: center; font-weight: 700; margin-bottom: 10px; font-size: 0.95rem; font-family: 'Cairo', sans-serif;">الآلة الحاسبة</div>
@@ -245,7 +242,6 @@ else:
     """
     components.html(CALC_HTML, height=270)
 
-    # 3. حساب الإحصائيات
     customers = get_customers()
     all_records = []
     for c in customers:
@@ -258,7 +254,6 @@ else:
     total_paid_amount = sum(r["amount"] for r in all_records if r["type"] == "تسديد")
     net_amount = total_debt_amount - total_paid_amount
 
-    # 4. قسم ملخص الإحصائيات والمربعات الأربعة بتنسيق الألوان المطلوب
     st.markdown("<div style='font-weight:700; margin-bottom:10px; color:#1e293b; font-size:1.05rem;'>📊 ملخص الاحصائيات</div>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
@@ -295,7 +290,6 @@ else:
 
     st.markdown("---")
 
-    # 5. إضافة عميل جديد
     with st.expander("➕ إضافة عميل جديد"):
         with st.form("new_cust_form", clear_on_submit=True):
             new_name = st.text_input("اسم العميل")
@@ -308,7 +302,6 @@ else:
                     except:
                         st.error("الاسم موجود مسبقاً")
 
-    # 6. قائمة العملاء
     st.markdown("### 👥 قائمة العملاء")
     search = st.session_state.get("customer_search", "")
     if search.strip():
@@ -321,4 +314,11 @@ else:
         st.info("لا يوجد عملاء حالياً.")
     else:
         for customer in shown_customers:
-            with st.container
+            with st.container():
+                c_name, c_btn = st.columns([3, 1])
+                with c_name:
+                    st.markdown(f"**👤 {customer['name']}**")
+                with c_btn:
+                    if st.button("فتح السجل", key=f"cust_{customer['id']}", use_container_width=True):
+                        st.session_state.selected_customer_id = customer["id"]
+                        st.rerun()
