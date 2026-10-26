@@ -145,19 +145,14 @@ def parse_amount(text: str) -> float:
     if not s:
         raise ValueError("القيمة فارغة")
 
-    # تحويل الأرقام العربية إلى إنجليزية
     s = s.translate(_AR_DIGITS)
-
-    # إزالة المسافات
     s = s.replace(" ", "")
 
     if not s:
         raise ValueError("القيمة فارغة")
 
-    # التعامل مع الفواصل والنجوم
     s = s.replace("٬", "").replace("،", "")
 
-    # دعم الأرقام بالشكل: 250,75 ; 250.75 ; 2,500.75 ; 2,500,75
     if "," in s and "." in s:
         last_comma = s.rfind(",")
         last_dot = s.rfind(".")
@@ -169,13 +164,10 @@ def parse_amount(text: str) -> float:
     elif "," in s:
         parts = s.split(",")
         if len(parts) > 1:
-            # إذا كانت الفاصلة الأخيرة بعد 3 أرقام => فاصل آلاف
             if len(parts[-1]) == 3 and all(len(p) <= 3 for p in parts[:-1]):
                 s = "".join(parts)
             else:
-                # إذا كانت الفاصلة العشرية
                 s = ".".join(parts)
-    # لو فيها "." فقط، سنتركها كما هي
 
     try:
         value = float(s)
@@ -265,130 +257,218 @@ def remaining_color(value):
     return "#dc2626" if value > 0 else "#059669"
 
 
-# ---------- Floating Calculator ----------
+# ---------- Floating Calculator (Samsung S25 Style - Continuous Expression Entry) ----------
 CALC_HTML = r"""
 <script>
 (() => {
+  const parentDoc = window.parent.document;
   const rootId = "fcalc-root";
-  if (window.__fcalc_loaded) return;
-  window.__fcalc_loaded = true;
+  if (parentDoc.getElementById(rootId)) return;
 
-  const doc = document;
-  if (doc.getElementById(rootId)) return;
-
-  const style = doc.createElement("style");
+  const style = parentDoc.createElement("style");
   style.id = "fcalc-style";
   style.textContent = `
     #fcalc-btn {
       position: fixed; bottom: 25px; left: 25px; z-index: 2147483000;
-      width: 55px; height: 55px; border: none; border-radius: 50%;
-      background: #2563eb; color: #fff; font-size: 24px; cursor: pointer;
-      box-shadow: 0 4px 20px rgba(37,99,235,.4); display: flex;
-      align-items: center; justify-content: center; transition: transform .2s;
+      width: 60px; height: 60px; border: none; border-radius: 20px;
+      background: linear-gradient(135deg, #007aff, #0056b3); color: #fff; font-size: 26px; cursor: pointer;
+      box-shadow: 0 8px 25px rgba(0,122,255,.4); display: flex;
+      align-items: center; justify-content: center; transition: transform .2s, box-shadow .2s;
     }
-    #fcalc-btn:hover { transform: scale(1.1); }
+    #fcalc-btn:hover { transform: scale(1.08); box-shadow: 0 12px 30px rgba(0,122,255,.6); }
+    
     #fcalc-box {
-      position: fixed; bottom: 95px; left: 25px; z-index: 2147483000;
-      width: 280px; padding: 15px; border-radius: 16px; background: #172033;
-      color: #fff; display: none; box-shadow: 0 10px 30px rgba(0,0,0,.4);
+      position: fixed; bottom: 100px; left: 25px; z-index: 2147483000;
+      width: 320px; padding: 18px; border-radius: 24px; background: rgba(24, 24, 27, 0.98);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      color: #fff; display: none; box-shadow: 0 20px 50px rgba(0,0,0,.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
-    #fcalc-box.open { display: block; }
-    #fcalc-display {
-      box-sizing: border-box; width: 100%; height: 45px; border: 0;
-      border-radius: 8px; background: #0b1220; color: #67e8f9; text-align: right;
-      font-size: 22px; padding: 7px; margin-bottom: 10px; direction: ltr;
-    }
-    #fcalc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    #fcalc-grid button { border: 0; border-radius: 8px; padding: 10px; background: #334155; color: #fff; font-size: 16px; cursor: pointer; }
-    #fcalc-grid button:hover { background: #475569; }
-    #fcalc-grid button.op { background: #2563eb; }
-    #fcalc-grid button.op:hover { background: #1d4ed8; }
-    #fcalc-grid button.clr { background: #dc2626; grid-column: span 2; }
-    #fcalc-grid button.clr:hover { background: #b91c1c; }
-  `;
-  doc.head.appendChild(style);
+    #fcalc-box.open { display: block; animation: fcalc-fadein 0.2s ease-out; }
 
-  const root = doc.createElement("div");
+    @keyframes fcalc-fadein {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fcalc-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+      color: #a1a1aa; font-size: 13px; font-weight: 600; padding: 0 4px;
+    }
+    .fcalc-close { background: none; border: none; color: #a1a1aa; font-size: 16px; cursor: pointer; }
+    .fcalc-close:hover { color: #fff; }
+
+    #fcalc-display-container {
+      background: rgba(9, 9, 11, 0.9); border-radius: 16px; padding: 14px 16px; margin-bottom: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.05); text-align: right; direction: ltr;
+      min-height: 65px; display: flex; align-items: center; justify-content: flex-end; overflow-x: auto;
+    }
+    #fcalc-display {
+      font-size: 24px; font-weight: 700; color: #f4f4f5; word-break: break-all; width: 100%; white-space: nowrap;
+    }
+
+    #fcalc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    #fcalc-grid button {
+      border: 0; border-radius: 14px; padding: 14px 0; background: #27272a; color: #f4f4f5;
+      font-size: 18px; font-weight: 600; cursor: pointer; transition: background .15s, transform .1s;
+    }
+    #fcalc-grid button:hover { background: #3f3f46; }
+    #fcalc-grid button:active { transform: scale(0.95); }
+    
+    #fcalc-grid button.op { background: #3f3f46; color: #38bdf8; }
+    #fcalc-grid button.op:hover { background: #52525b; }
+    
+    #fcalc-grid button.action { background: rgba(220, 38, 38, 0.2); color: #f87171; }
+    #fcalc-grid button.action:hover { background: rgba(220, 38, 38, 0.3); }
+
+    #fcalc-grid button.equals { background: #007aff; color: #fff; grid-column: span 2; }
+    #fcalc-grid button.equals:hover { background: #0062cc; }
+  `;
+  parentDoc.head.appendChild(style);
+
+  const root = parentDoc.createElement("div");
   root.id = rootId;
   root.innerHTML = `
-    <button id="fcalc-btn" type="button" title="الحاسبة">🧮</button>
+    <button id="fcalc-btn" type="button" title="حاسبة سامسونج">🧮</button>
     <div id="fcalc-box" dir="ltr">
-      <input id="fcalc-display" readonly value="">
+      <div class="fcalc-header">
+        <span>Samsung Calculator S25</span>
+        <button class="fcalc-close" id="fcalc-close-btn">✕</button>
+      </div>
+      <div id="fcalc-display-container">
+        <div id="fcalc-display">0</div>
+      </div>
       <div id="fcalc-grid"></div>
     </div>
   `;
-  doc.body.appendChild(root);
+  parentDoc.body.appendChild(root);
 
-  const box = doc.getElementById("fcalc-box");
-  const display = doc.getElementById("fcalc-display");
-  const grid = doc.getElementById("fcalc-grid");
+  const box = parentDoc.getElementById("fcalc-box");
+  const displayEl = parentDoc.getElementById("fcalc-display");
+
+  let expr = "0";
+  let justCalculated = false;
 
   const keys = [
-    ["C", "مسح", "clr"], ["⌫", "⌫", ""], ["/", "÷", "op"],
-    ["7", "7", ""], ["8", "8", ""], ["9", "9", ""], ["*", "×", "op"],
-    ["4", "4", ""], ["5", "5", ""], ["6", "6", ""], ["-", "−", "op"],
-    ["1", "1", ""], ["2", "2", ""], ["3", "3", ""], ["+", "+", "op"],
-    ["0", "0", ""], [".", ".", ""], ["=", "=", "op"]
+    ["C", "C", "action"], ["(", "(", "op"], [")", ")", "op"], ["⌫", "⌫", "action"],
+    ["7", "7", ""], ["8", "8", ""], ["9", "9", ""], ["/", "÷", "op"],
+    ["4", "4", ""], ["5", "5", ""], ["6", "6", ""], ["*", "×", "op"],
+    ["1", "1", ""], ["2", "2", ""], ["3", "3", ""], ["-", "−", "op"],
+    ["0", "0", ""], [".", ".", ""], ["%", "%", "op"], ["+", "+", "op"],
+    ["=", "=", "equals"]
   ];
 
+  const grid = parentDoc.getElementById("fcalc-grid");
   keys.forEach((k) => {
-    const b = doc.createElement("button");
-    b.type = "button";
+    const b = parentDoc.createElement("button");
     b.textContent = k[1];
     b.setAttribute("data-k", k[0]);
     if (k[2]) b.className = k[2];
     grid.appendChild(b);
   });
 
-  doc.getElementById("fcalc-btn").addEventListener("click", () => {
+  parentDoc.getElementById("fcalc-btn").addEventListener("click", () => {
     box.classList.toggle("open");
   });
+  parentDoc.getElementById("fcalc-close-btn").addEventListener("click", () => {
+    box.classList.remove("open");
+  });
 
-  function calculate() {
-    try {
-      const expr = display.value;
-      if (!/^[0-9+\-*\/.() ]+$/.test(expr)) throw new Error("invalid");
-      const result = Function('"use strict"; return (' + expr + ')')();
-      if (typeof result !== "number" || !isFinite(result)) throw new Error("invalid");
-      display.value = String(parseFloat(result.toFixed(10)));
-    } catch (e) {
-      display.value = "خطأ";
-    }
-  }
+  function handleButton(k) {
+    if (expr === "خطأ") expr = "0";
 
-  function press(k) {
-    if (display.value === "خطأ") display.value = "";
     if (k === "C") {
-      display.value = "";
+      expr = "0";
+      justCalculated = false;
     } else if (k === "⌫") {
-      display.value = display.value.slice(0, -1);
+      if (justCalculated) {
+        expr = "0";
+        justCalculated = false;
+      } else if (expr.length > 1) {
+        expr = expr.trim();
+        expr = expr.slice(0, -1).trim();
+        if (expr === "" || expr === "−" || expr === "-") expr = "0";
+      } else {
+        expr = "0";
+      }
     } else if (k === "=") {
-      calculate();
+      try {
+        let evalStr = expr
+          .replace(/×/g, '*')
+          .replace(/÷/g, '/')
+          .replace(/−/g, '-')
+          .replace(/([0-9.]+)(%)/g, '($1/100)');
+
+        if (!/^[0-9+\-*\/.() ]+$/.test(evalStr)) throw new Error("invalid");
+        
+        let res = Function('"use strict"; return (' + evalStr + ')')();
+        if (typeof res !== "number" || !isFinite(res)) throw new Error("invalid");
+        
+        expr = String(parseFloat(res.toFixed(10)));
+        justCalculated = true;
+      } catch (e) {
+        expr = "خطأ";
+        justCalculated = true;
+      }
     } else {
-      display.value += k;
+      let isOp = ["+", "-", "*", "/", "%"].includes(k);
+      let symbol = k;
+      if (k === "*") symbol = "×";
+      else if (k === "/") symbol = "÷";
+      else if (k === "-") symbol = "−";
+      else if (k === "+") symbol = "+";
+
+      if (justCalculated) {
+        if (isOp) {
+          expr = expr + " " + symbol + " ";
+        } else {
+          expr = (k === "." ? "0." : k);
+        }
+        justCalculated = false;
+      } else {
+        if (expr === "0") {
+          if (isOp || k === "%") {
+            expr = "0 " + symbol + " ";
+          } else if (k === ".") {
+            expr = "0.";
+          } else if (k === "(") {
+            expr = "(";
+          } else {
+            expr = k;
+          }
+        } else {
+          if (isOp) {
+            expr += " " + symbol + " ";
+          } else {
+            expr += k;
+          }
+        }
+      }
     }
+    displayEl.textContent = expr;
   }
 
   grid.addEventListener("click", (e) => {
     const k = e.target.getAttribute("data-k");
-    if (k) press(k);
+    if (k) handleButton(k);
   });
 
-  doc.addEventListener("keydown", (e) => {
+  parentDoc.addEventListener("keydown", (e) => {
     if (!box.classList.contains("open")) return;
     const tag = (e.target.tagName || "").toLowerCase();
-    if (tag === "input" && e.target.id !== "fcalc-display") return;
-    if (tag === "textarea" || tag === "select") return;
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
 
-    if (/^[0-9+\-*\/.]$/.test(e.key)) {
-      press(e.key);
+    if (/^[0-9+\-*\/.()]$/.test(e.key)) {
+      handleButton(e.key);
     } else if (e.key === "Enter" || e.key === "=") {
       e.preventDefault();
-      press("=");
+      handleButton("=");
     } else if (e.key === "Backspace") {
-      press("⌫");
+      handleButton("⌫");
     } else if (e.key === "Escape") {
       box.classList.remove("open");
+    } else if (e.key === "%") {
+      handleButton("%");
     }
   });
 })();
